@@ -1,0 +1,214 @@
+# CyberSentinel — Threat Intelligence SIEM Platform
+
+A full-stack, Dockerised threat intelligence dashboard for SOC teams.  
+Built for **Virtual Galaxy Infotech Ltd** · Bank client log analysis.
+
+---
+
+## What's inside
+
+```
+cybersentinel/
+├── docker-compose.yml          ← Run everything with one command
+├── .env.example                ← Copy to .env and fill in keys
+│
+├── frontend/                   ← Single-page dashboard (nginx)
+│   ├── index.html              ← Full threat intel UI
+│   ├── nginx.conf
+│   └── Dockerfile
+│
+├── backend/                    ← FastAPI REST API
+│   ├── main.py                 ← Log ingestion, IP trail, blocklist, intel
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── ml-engine/                  ← ML anomaly detection (FastAPI)
+│   ├── main.py                 ← Isolation Forest, subnet clustering, risk scoring
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── redis-config/               ← Redis with persistence
+│   ├── redis.conf
+│   └── Dockerfile
+│
+├── nginx/                      ← Reverse proxy (routes /api/ml → ml-engine, /api → backend)
+│   ├── nginx.conf
+│   └── Dockerfile
+│
+├── scripts/
+│   ├── watch_and_ingest.py     ← Continuous folder watcher for live log ingestion
+│   └── fortigate_autoblock.py  ← Push blocklist to Fortigate via REST API
+│
+└── sample-data/
+    ├── generate_sample_data.py ← Generates realistic test logs
+    └── sample_logs.csv         ← Ready-to-use sample (1,390 events)
+```
+
+---
+
+## Quick start
+
+### 1. Prerequisites
+- Docker + Docker Compose installed
+- Ports 80, 8000, 8001, 6379 free
+
+### 2. Clone / unzip and start
+```bash
+cd cybersentinel
+cp .env.example .env           # optionally add ABUSEIPDB_KEY
+docker compose up --build -d
+```
+
+### 3. Open dashboard
+```
+http://localhost
+```
+
+### 4. Load sample data
+- Go to **Ingest Logs** in the sidebar
+- Upload `sample-data/sample_logs.csv`
+- Wait ~5 seconds, click **Refresh**
+- Go to **Overview** — metrics and charts populate automatically
+
+### 5. Train ML model
+- Go to **ML Anomaly**
+- Click **Train ML model**
+- Click **Load anomalies** — see which IPs Isolation Forest flagged
+
+---
+
+## Features
+
+### Dashboard pages
+
+| Page | What it does |
+|------|-------------|
+| Overview | Metric cards, threat distribution chart, hot IP table |
+| IP Trail | Full chronological event history for any IP |
+| Live Alerts | All events from hot IPs, real-time |
+| ML Anomaly | Train Isolation Forest, score IPs, list anomalies |
+| Subnet Clusters | NetworkX graph clustering — finds coordinated attack groups |
+| Blocklist | View, add, remove blocked IPs |
+| Ingest Logs | Upload CSV or paste single JSON log event |
+
+### Backend API endpoints
+
+```
+POST /api/ingest/csv              Upload a CSV log file
+POST /api/ingest/log              Ingest a single JSON log
+GET  /api/trail/{ip}              Full event trail for an IP
+GET  /api/trail/{ip}/summary      Summary (first/last seen, threat types)
+GET  /api/stats                   Global metrics
+GET  /api/hot-ips                 All high/critical severity IPs
+GET  /api/intel/{ip}              Threat intel (local + AbuseIPDB)
+GET  /api/blocklist               View blocklist
+POST /api/blocklist/add           Block an IP
+DEL  /api/blocklist/{ip}          Unblock an IP
+GET  /api/search?q=               Search IPs by prefix
+```
+
+### ML Engine endpoints
+
+```
+POST /api/ml/train                Train Isolation Forest on all ingested IPs
+GET  /api/ml/score/{ip}           Score a specific IP (anomaly + risk 0-100)
+GET  /api/ml/anomalies            List all detected anomalies
+GET  /api/ml/clusters             Subnet clustering (coordinated attack groups)
+GET  /api/ml/health               Health + model status
+```
+
+---
+
+## For live/continuous ingestion
+
+### Option A — Folder watcher
+Point your SIEM to export logs to a folder, then run:
+```bash
+python scripts/watch_and_ingest.py \
+  --folder /var/log/siem-exports \
+  --api http://localhost:8000 \
+  --interval 10
+```
+
+### Option B — Direct API push
+From your Wazuh / Fortigate log shipper, POST each event:
+```bash
+curl -X POST http://localhost:8000/api/ingest/log \
+  -H "Content-Type: application/json" \
+  -d '{"@timestamp":"2026-04-22T09:30:00Z","rule.description":"Login failed","data.ui":"85.11.187.36"}'
+```
+
+### Option C — Fortigate auto-block integration
+```bash
+python scripts/fortigate_autoblock.py \
+  --cs-api http://localhost:8000 \
+  --fg-host 192.168.1.1 \
+  --fg-token YOUR_TOKEN \
+  --dry-run     # remove --dry-run when ready for real blocks
+```
+
+---
+
+## ML explanation
+
+### Isolation Forest (anomaly detection)
+- **What it does:** Trains on all IPs in Redis, learns what "normal" looks like
+- **Features used:** event rate per minute, inter-event interval, unique dst IPs, unique dst ports, % critical/high severity, brute_force count, ssh_bf count, rdp count, db_scan count
+- **Output:** anomaly score (negative = more anomalous) + risk score 0–100
+- **Retrain:** POST /api/ml/train — do this after every major log ingestion
+
+### Subnet clustering (NetworkX)
+- **What it does:** Builds a graph where IPs in the same /24 subnet are connected
+- **Output:** connected components = coordinated attack groups
+- **Why it matters:** The 85.11.x.x subnet (21 IPs, 1,769 events) is one cluster = one actor
+
+---
+
+## Adding AbuseIPDB live intel
+
+1. Register free at https://www.abuseipdb.com/register
+2. Copy your API key
+3. Add to `.env`: `ABUSEIPDB_KEY=your_key`
+4. `docker compose restart backend`
+5. Now IP Trail → **+ Intel** shows live reputation scores
+
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| ABUSEIPDB_KEY | demo | AbuseIPDB API key for live threat intel |
+| REDIS_HOST | redis | Redis hostname |
+| REDIS_PORT | 6379 | Redis port |
+| LOG_LEVEL | INFO | Backend log level |
+| MODEL_RETRAIN_HOURS | 24 | ML auto-retrain interval (future) |
+
+---
+
+## Architecture
+
+```
+Browser
+  ↓ :80
+Nginx (reverse proxy)
+  ↓ /api/ml/*        ↓ /api/*         ↓ /
+ML Engine :8001    Backend :8000    Frontend :80
+  ↓                   ↓
+  └──────── Redis :6379 ────────────┘
+             (IP trails, stats,
+              blocklist, ML scores)
+```
+
+---
+
+## Extending this
+
+| What to add | How |
+|-------------|-----|
+| Real-time WebSocket push | Add FastAPI WebSocket endpoint, use `redis.pubsub()` |
+| Email alerts for P1 | Add `smtplib` call in backend when severity=critical |
+| Grafana dashboards | Redis → Prometheus exporter → Grafana |
+| MISP integration | POST IOCs to MISP API from backend on each new hot IP |
+| Elasticsearch backend | Replace Redis trail store with ES for full-text search |
+| Wazuh direct integration | Use Wazuh Logstash output → POST to `/api/ingest/log` |

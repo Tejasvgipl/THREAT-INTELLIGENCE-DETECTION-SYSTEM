@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  redis:
+    build: ./redis-config
+    container_name: cs_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: cs_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ABUSEIPDB_KEY=${ABUSEIPDB_KEY:-demo}
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./sample-data:/app/sample-data
+      - ./scripts:/app/scripts
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ml-engine:
+    build: ./ml-engine
+    container_name: cs_ml
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_RETRAIN_HOURS=24
+    volumes:
+      - ml_models:/app/models
+      - ./sample-data:/app/sample-data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: cs_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+      - ml-engine
+    restart: unless-stopped
+
+  nginx:
+    build: ./nginx
+    container_name: cs_nginx
+    ports:
+      - "8888:80"
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  ml_models:

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CyberSentinel — Threat Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg:       #0d1117;
+  --bg2:      #161b22;
+  --bg3:      #21262d;
+  --border:   #30363d;
+  --text:     #e6edf3;
+  --muted:    #8b949e;
+  --accent:   #58a6ff;
+  --danger:   #f85149;
+  --warn:     #e3b341;
+  --ok:       #3fb950;
+  --purple:   #bc8cff;
+  --mono:     'Courier New', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ── Layout ── */
+.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.sidebar { background: var(--bg2); border-right: 1px solid var(--border); padding: 0; display: flex; flex-direction: column; }
+.main { overflow-y: auto; }
+
+/* ── Sidebar ── */
+.logo { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.logo-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+.logo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.nav { padding: 12px 0; flex: 1; }
+.nav-section { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 20px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 20px; cursor: pointer; color: var(--muted); font-size: 13px; border-left: 2px solid transparent; }
+.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(88,166,255,.06); }
+.nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.nav-dot.danger { background: var(--danger); }
+.nav-dot.ok { background: var(--ok); }
+.nav-dot.warn { background: var(--warn); }
+.sidebar-footer { padding: 12px 20px; border-top: 1px solid var(--border); }
+.status-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Topbar ── */
+.topbar { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--bg2); position: sticky; top: 0; z-index: 10; }
+.topbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
+.search-wrap { display: flex; align-items: center; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; flex: 1; max-width: 320px; }
+.search-wrap input { background: none; border: none; outline: none; color: var(--text); font-size: 13px; flex: 1; }
+.search-wrap input::placeholder { color: var(--muted); }
+.btn { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 12px; cursor: pointer; transition: background .15s; }
+.btn:hover { background: var(--border); }
+.btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+/* ── Pages ── */
+.page { display: none; padding: 24px; }
+.page.active { display: block; }
+
+/* ── Metric grid ── */
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.metric { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.metric-val { font-size: 28px; font-weight: 700; }
+.metric-val.danger { color: var(--danger); }
+.metric-val.warn   { color: var(--warn); }
+.metric-val.ok     { color: var(--ok); }
+.metric-val.accent { color: var(--accent); }
+.metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ── Cards ── */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.card-title { font-size: 13px; font-weight: 600; }
+.card-body { padding: 16px; }
+
+/* ── Table ── */
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th { text-align: left; padding: 8px 12px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+.tbl td { padding: 9px 12px; border-bottom: 1px solid rgba(48,54,61,.5); font-family: var(--mono); }
+.tbl tr:hover td { background: var(--bg3); }
+.tbl tr:last-child td { border-bottom: none; }
+
+/* ── Badges ── */
+.badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.badge.critical { background: rgba(248,81,73,.18); color: #f85149; }
+.badge.high     { background: rgba(227,179,65,.18); color: #e3b341; }
+.badge.medium   { background: rgba(88,166,255,.18); color: #58a6ff; }
+.badge.low      { background: rgba(63,185,80,.18); color: #3fb950; }
+.badge.blocked  { background: rgba(188,140,255,.18); color: #bc8cff; }
+
+/* ── IP Trail ── */
+.trail-list { max-height: 480px; overflow-y: auto; }
+.trail-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(48,54,61,.4); }
+.trail-item:last-child { border-bottom: none; }
+.trail-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.trail-dot.critical { background: var(--danger); }
+.trail-dot.high     { background: var(--warn); }
+.trail-dot.medium   { background: var(--accent); }
+.trail-dot.low      { background: var(--ok); }
+.trail-ts { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 165px; flex-shrink: 0; }
+.trail-desc { font-size: 12px; color: var(--muted); flex: 1; line-height: 1.5; }
+.trail-desc b { color: var(--text); font-weight: 500; }
+.trail-badge-wrap { flex-shrink: 0; }
+
+/* ── Chart wrappers ── */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.chart-box h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.chart-wrap { position: relative; height: 220px; }
+
+/* ── Upload zone ── */
+.upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s; }
+.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); }
+.upload-zone h3 { color: var(--text); margin-bottom: 8px; }
+.upload-zone p  { color: var(--muted); font-size: 12px; }
+.progress-wrap { background: var(--bg3); border-radius: 4px; height: 6px; margin-top: 12px; overflow: hidden; display: none; }
+.progress-bar  { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+
+/* ── Blocklist ── */
+.block-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,.4); }
+.block-ip  { font-family: var(--mono); font-size: 12px; flex: 1; }
+.block-src { font-size: 11px; color: var(--muted); min-width: 70px; }
+
+/* ── IP detail panel ── */
+.ip-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+.ip-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.ip-addr-big { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+.ip-meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.ip-meta { background: var(--bg3); border-radius: 6px; padding: 10px; }
+.ip-meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+.ip-meta-val   { font-size: 15px; font-weight: 600; }
+
+/* ── Cluster map ── */
+.cluster-card { background: var(--bg3); border-radius: 6px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+.cluster-subnet { font-family: var(--mono); font-size: 13px; font-weight: 600; min-width: 140px; }
+.cluster-bar-bg { flex: 1; height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; }
+.cluster-bar    { height: 100%; border-radius: 3px; }
+.cluster-count  { font-size: 12px; color: var(--muted); min-width: 80px; text-align: right; }
+
+/* ── Toast ── */
+.toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+.toast { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 10px 16px; font-size: 12px; animation: slideIn .2s ease; max-width: 320px; }
+.toast.ok   { border-left: 3px solid var(--ok); }
+.toast.err  { border-left: 3px solid var(--danger); }
+.toast.warn { border-left: 3px solid var(--warn); }
+@keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-title">CyberSentinel</div>
+      <div class="logo-sub">Threat Intelligence Platform</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Monitor</div>
+      <div class="nav-item active" onclick="showPage('overview')"><span class="nav-dot danger"></span>Overview</div>
+      <div class="nav-item" onclick="showPage('trail')"><span class="nav-dot warn"></span>IP Trail</div>
+      <div class="nav-item" onclick="showPage('alerts')"><span class="nav-dot danger"></span>Live Alerts</div>
+      <div class="nav-section">Detection</div>
+      <div class="nav-item" onclick="showPage('ml')"><span class="nav-dot ok"></span>ML Anomaly</div>
+      <div class="nav-item" onclick="showPage('clusters')"><span class="nav-dot warn"></span>Subnet Clusters</div>
+      <div class="nav-section">Control</div>
+      <div class="nav-item" onclick="showPage('blocklist')"><span class="nav-dot danger"></span>Blocklist</div>
+      <div class="nav-item" onclick="showPage('ingest')"><span class="nav-dot ok"></span>Ingest Logs</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-row"><span class="pulse"></span>Backend API</div>
+      <div class="status-row" id="mlstatus"><span style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span>ML Engine</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px" id="last-refresh">—</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <h1 id="page-title">Overview</h1>
+      <div class="search-wrap">
+        <svg width="14" height="14" fill="none" stroke="var(--muted)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
+        <input id="ip-search" placeholder="Search IP address…" onkeydown="if(event.key==='Enter')searchIP()"/>
+      </div>
+      <button class="btn" onclick="searchIP()">Search</button>
+      <button class="btn primary" onclick="refreshAll()">↻ Refresh</button>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div id="page-overview" class="page active">
+      <div class="metric-grid" id="metric-grid">
+        <div class="metric"><div class="metric-label">Total logs</div><div class="metric-val accent" id="m-total">—</div><div class="metric-sub">ingested</div></div>
+        <div class="metric"><div class="metric-label">Unique IPs</div><div class="metric-val accent" id="m-ips">—</div><div class="metric-sub">tracked</div></div>
+        <div class="metric"><div class="metric-label">Hot IPs</div><div class="metric-val danger" id="m-hot">—</div><div class="metric-sub">critical/high severity</div></div>
+        <div class="metric"><div class="metric-label">Auto-blocked</div><div class="metric-val warn" id="m-blocked">—</div><div class="metric-sub">bad subnets</div></div>
+        <div class="metric"><div class="metric-label">Brute force</div><div class="metric-val danger" id="m-bf">—</div><div class="metric-sub">events</div></div>
+        <div class="metric"><div class="metric-label">Known malicious</div><div class="metric-val danger" id="m-km">—</div><div class="metric-sub">Dshield / Spamhaus</div></div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-box">
+          <h3>Threat distribution</h3>
+          <div class="chart-wrap"><canvas id="chart-threat" role="img" aria-label="Threat type distribution pie chart"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <h3>Top hot IPs by events</h3>
+          <div class="chart-wrap"><canvas id="chart-hotips" role="img" aria-label="Top hot IPs bar chart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Hot IPs — critical &amp; high severity actors</span><span id="hot-count" style="font-size:11px;color:var(--muted)"></span></div>
+        <div class="card-body" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>IP Address</th><th>Events</th><th>First seen</th><th>Last seen</th><th>Top threat</th><th>Severity</th><th>Actions</th></tr></thead>
+            <tbody id="hot-ip-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- IP TRAIL -->
+    <div id="page-trail" class="page">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="display:flex;gap:10px">
+          <input id="trail-ip-input" placeholder="Enter IP address (e.g. 85.11.187.36)" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+          <button class="btn primary" onclick="loadTrail()">Load trail</button>
+          <button class="btn" onclick="loadTrailIntel()">+ Intel</button>
+        </div>
+      </div>
+
+      <div id="trail-summary-panel" style="display:none">
+        <div class="ip-panel">
+          <div class="ip-header">
+            <div class="ip-addr-big" id="ts-ip">—</div>
+            <span class="badge" id="ts-badge">—</span>
+            <span id="ts-block-badge" style="display:none" class="badge blocked">Blocked</span>
+          </div>
+          <div class="ip-meta-grid">
+            <div class="ip-meta"><div class="ip-meta-label">Total events</div><div class="ip-meta-val accent" id="ts-total">—</div></div>
+            <div class="ip-meta"><div class="ip-meta-label">First seen</div><div class="ip-meta-val" style="font-size:11px;font-family:var(--mono)" id="ts-first">—</div></div>
+            <div class="ip-meta"><div class="ip-meta-label">Last seen</div><div class="ip-meta-val" style="font-size:11px;font-family:var(--mono)" id="ts-last">—</div></div>
+            <div class="ip-meta"><div class="ip-meta-label">Top threat</div><div class="ip-meta-val" id="ts-threat">—</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="ts-threat-badges"></div>
+        </div>
+
+        <div id="intel-panel" style="display:none" class="card">
+          <div class="card-header"><span class="card-title">Threat intel</span></div>
+          <div class="card-body" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.8"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Event trail — chronological</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn" style="font-size:11px" onclick="blockCurrentIP()">Block IP</button>
+            </div>
+          </div>
+          <div class="trail-list" id="trail-events"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE ALERTS -->
+    <div id="page-alerts" class="page">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <span style="font-size:12px;color:var(--muted)">Showing hot IP events</span>
+        <button class="btn" onclick="loadAlerts()">↻ Refresh</button>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>Time</th><th>Source IP</th><th>Threat type</th><th>Rule</th><th>Severity</th><th>Dst IP</th></tr></thead>
+            <tbody id="alerts-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ML ANOMALY -->
+    <div id="page-ml" class="page">
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn primary" onclick="trainModel()">Train ML model</button>
+        <button class="btn" onclick="loadAnomalies()">Load anomalies</button>
+        <div id="train-status" style="font-size:12px;color:var(--muted);align-self:center"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <input id="ml-ip-input" placeholder="Score a specific IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+        <button class="btn" onclick="scoreIP()">Score IP</button>
+      </div>
+
+      <div id="ml-score-panel" style="display:none" class="card">
+        <div class="card-header"><span class="card-title">IP Risk Score</span></div>
+        <div class="card-body" id="ml-score-body"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Detected anomalies — Isolation Forest</span></div>
+        <div class="card-body" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>IP Address</th><th>Risk score</th><th>Anomaly score</th><th>Status</th></tr></thead>
+            <tbody id="anomaly-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBNET CLUSTERS -->
+    <div id="page-clusters" class="page">
+      <div style="margin-bottom:16px">
+        <button class="btn primary" onclick="loadClusters()">Analyse clusters</button>
+        <span style="font-size:12px;color:var(--muted);margin-left:12px">Detects coordinated attack groups by shared /24 subnet</span>
+      </div>
+      <div id="clusters-panel"></div>
+    </div>
+
+    <!-- BLOCKLIST -->
+    <div id="page-blocklist" class="page">
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <input id="block-ip-input" placeholder="Manually block an IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+        <button class="btn danger" onclick="manualBlock()">Block</button>
+        <button class="btn" onclick="loadBlocklist()">↻ Refresh</button>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Active blocklist</span><span id="block-count" style="font-size:11px;color:var(--muted)"></span></div>
+        <div class="card-body" id="blocklist-body"></div>
+      </div>
+    </div>
+
+    <!-- INGEST -->
+    <div id="page-ingest" class="page">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Upload CSV log file</span></div>
+        <div class="card-body">
+          <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()" ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave()">
+            <h3>Drop your CSV file here</h3>
+            <p>or click to browse — supports CyberSentinel log exports</p>
+            <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="uploadCSV(this.files[0])"/>
+          </div>
+          <div class="progress-wrap" id="progress-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+          <div id="upload-status" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Or paste a single JSON log event</span></div>
+        <div class="card-body">
+          <textarea id="json-log" rows="6" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;resize:vertical" placeholder='{"@timestamp":"2026-04-22T09:29:52Z","rule.description":"Fortigate: Login failed.","data.ui":"85.11.187.36","rule.id":"81606","data.action":"login","data.level":"alert"}'></textarea>
+          <button class="btn primary" style="margin-top:10px" onclick="ingestSingleLog()">Ingest log</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+const API  = '/api';
+const MLAPI = '/api/ml';
+
+let charts = {};
+let currentIP = '';
+let statsData = {};
+
+// ─── Navigation ─────────────────────────────────────────────────────────────
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(name)) {
+      n.classList.add('active');
+    }
+  });
+  const titles = { overview:'Overview', trail:'IP Trail', alerts:'Live Alerts', ml:'ML Anomaly Detection', clusters:'Subnet Cluster Analysis', blocklist:'Blocklist', ingest:'Ingest Logs' };
+  document.getElementById('page-title').textContent = titles[name] || name;
+
+  if (name === 'overview')   refreshAll();
+  if (name === 'blocklist')  loadBlocklist();
+  if (name === 'alerts')     loadAlerts();
+  if (name === 'clusters')   loadClusters();
+  if (name === 'ml')         loadAnomalies();
+}
+
+// ─── Toast ──────────────────────────────────────────────────────────────────
+
+function toast(msg, type='ok') {
+  const wrap = document.getElementById('toast-wrap');
+  const el   = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ─── API helpers ─────────────────────────────────────────────────────────────
+
+async function apiFetch(url, opts={}) {
+  try {
+    const r = await fetch(url, opts);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch(e) {
+    toast('API error: ' + e.message, 'err');
+    return null;
+  }
+}
+
+// ─── Overview ────────────────────────────────────────────────────────────────
+
+async function refreshAll() {
+  const stats = await apiFetch(`${API}/stats`);
+  if (!stats) return;
+  statsData = stats;
+
+  document.getElementById('m-total').textContent   = stats.total_logs.toLocaleString();
+  document.getElementById('m-ips').textContent      = stats.unique_ips.toLocaleString();
+  document.getElementById('m-hot').textContent      = stats.hot_ips.length;
+  document.getElementById('m-blocked').textContent  = stats.blocklist.length;
+  document.getElementById('m-bf').textContent       = (stats.threat_counts.brute_force || 0).toLocaleString();
+  document.getElementById('m-km').textContent       = (stats.threat_counts.known_malicious || 0).toLocaleString();
+
+  document.getElementById('last-refresh').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
+  drawThreatChart(stats.threat_counts);
+
+  const hot = await apiFetch(`${API}/hot-ips`);
+  if (hot) {
+    drawHotIPChart(hot.slice(0, 8));
+    buildHotTable(hot);
+    document.getElementById('hot-count').textContent = hot.length + ' IPs';
+  }
+
+  // ML health check
+  const mlh = await apiFetch(`${MLAPI}/health`);
+  if (mlh) {
+    const el = document.getElementById('mlstatus');
+    el.innerHTML = mlh.model_ready
+      ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
+      : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> ML not trained';
+  }
+}
+
+function drawThreatChart(counts) {
+  const labels = Object.keys(counts);
+  const data   = Object.values(counts);
+  const colors = ['#f85149','#e3b341','#58a6ff','#3fb950','#bc8cff','#f0883e','#39d353'];
+
+  if (charts.threat) charts.threat.destroy();
+  const ctx = document.getElementById('chart-threat').getContext('2d');
+  charts.threat = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 10, padding: 10 } } }
+    }
+  });
+}
+
+function drawHotIPChart(hot) {
+  const labels = hot.map(h => h.ip);
+  const data   = hot.map(h => h.total);
+
+  if (charts.hotips) charts.hotips.destroy();
+  const ctx = document.getElementById('chart-hotips').getContext('2d');
+  charts.hotips = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Events', data, backgroundColor: '#f85149', borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10, family: 'Courier New' } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function buildHotTable(hot) {
+  const tbody = document.getElementById('hot-ip-table');
+  tbody.innerHTML = hot.slice(0, 30).map(h => {
+    const topThreat = h.threat_types ? Object.entries(h.threat_types).sort((a,b)=>b[1]-a[1])[0] : ['?', 0];
+    const sev = Object.entries(h.severities || {}).sort((a,b)=>b[1]-a[1])[0];
+    const sevClass = sev ? sev[0] : 'low';
+    return `<tr onclick="loadIPDetail('${h.ip}')" style="cursor:pointer">
+      <td style="color:var(--accent);font-weight:600">${h.ip}</td>
+      <td>${h.total}</td>
+      <td style="font-size:11px;color:var(--muted)">${h.first_seen ? h.first_seen.substring(0,19).replace('T',' ') : '—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${h.last_seen  ? h.last_seen.substring(0,19).replace('T',' ')  : '—'}</td>
+      <td>${topThreat[0].replace(/_/g,' ')}</td>
+      <td><span class="badge ${sevClass}">${sevClass}</span></td>
+      <td><button class="btn" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();loadIPDetail('${h.ip}')">Trail</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── IP Trail ────────────────────────────────────────────────────────────────
+
+async function searchIP() {
+  const q = document.getElementById('ip-search').value.trim();
+  if (!q) return;
+  showPage('trail');
+  document.getElementById('trail-ip-input').value = q;
+  await loadTrail();
+}
+
+async function loadIPDetail(ip) {
+  showPage('trail');
+  document.getElementById('trail-ip-input').value = ip;
+  await loadTrail();
+}
+
+async function loadTrail() {
+  const ip = document.getElementById('trail-ip-input').value.trim();
+  if (!ip) return;
+  currentIP = ip;
+
+  const [summary, trail] = await Promise.all([
+    apiFetch(`${API}/trail/${ip}/summary`),
+    apiFetch(`${API}/trail/${ip}?limit=200`)
+  ]);
+
+  if (!summary || !summary.found) { toast('No events found for ' + ip, 'warn'); return; }
+
+  document.getElementById('trail-summary-panel').style.display = 'block';
+  document.getElementById('ts-ip').textContent    = ip;
+  document.getElementById('ts-total').textContent = summary.total;
+  document.getElementById('ts-first').textContent = summary.first_seen ? summary.first_seen.substring(0,19).replace('T',' ') : '—';
+  document.getElementById('ts-last').textContent  = summary.last_seen  ? summary.last_seen.substring(0,19).replace('T',' ')  : '—';
+
+  const topThreat = summary.threat_types ? Object.entries(summary.threat_types).sort((a,b)=>b[1]-a[1])[0] : ['unknown',0];
+  document.getElementById('ts-threat').textContent = topThreat[0].replace(/_/g,' ');
+
+  const sev = summary.severities ? Object.entries(summary.severities).sort((a,b)=>b[1]-a[1])[0] : ['low',0];
+  const badge = document.getElementById('ts-badge');
+  badge.className = 'badge ' + (sev ? sev[0] : 'low');
+  badge.textContent = sev ? sev[0] : 'low';
+
+  document.getElementById('ts-block-badge').style.display = summary.is_blocked ? 'inline-block' : 'none';
+
+  const threatBadges = document.getElementById('ts-threat-badges');
+  threatBadges.innerHTML = Object.entries(summary.threat_types || {}).map(([k,v]) =>
+    `<span class="badge medium" style="margin-bottom:4px">${k.replace(/_/g,' ')}: ${v}</span>`
+  ).join('');
+
+  // Build trail events
+  if (trail && trail.events) {
+    const eventsHtml = trail.events.map(e => {
+      const sevCls = e.severity || 'low';
+      const ts = e.ts ? e.ts.substring(0,19).replace('T',' ') : '—';
+      return `<div class="trail-item">
+        <span class="trail-dot ${sevCls}"></span>
+        <span class="trail-ts">${ts}</span>
+        <span class="trail-desc">
+          <b>${(e.threat_type || 'unknown').replace(/_/g,' ')}</b> &mdash;
+          ${e.rule || ''}
+          ${e.signature ? `<br><span style="color:var(--accent);font-size:11px">${e.signature}</span>` : ''}
+          ${e.dst_ip ? `<br>→ ${e.dst_ip}${e.dst_port ? ':'+e.dst_port : ''}` : ''}
+          ${e.mitre ? `<span style="background:rgba(188,140,255,.15);color:#bc8cff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px">${e.mitre}</span>` : ''}
+        </span>
+        <div class="trail-badge-wrap"><span class="badge ${sevCls}">${sevCls}</span></div>
+      </div>`;
+    }).join('');
+    document.getElementById('trail-events').innerHTML = eventsHtml;
+  }
+}
+
+async function loadTrailIntel() {
+  if (!currentIP) return;
+  const intel = await apiFetch(`${API}/intel/${currentIP}`);
+  if (!intel) return;
+
+  const panel = document.getElementById('intel-panel');
+  const body  = document.getElementById('intel-body');
+  panel.style.display = 'block';
+
+  let html = `<b>IP:</b> ${intel.ip} &nbsp;|&nbsp; <b>Known bad subnet:</b> ${intel.is_known_bad ? '<span style="color:var(--danger)">YES</span>' : 'No'} &nbsp;|&nbsp; <b>In blocklist:</b> ${intel.in_blocklist ? '<span style="color:var(--danger)">YES</span>' : 'No'}<br>`;
+  if (intel.abuseipdb) {
+    const a = intel.abuseipdb;
+    html += `<b>AbuseIPDB score:</b> <span style="color:${a.score>50?'var(--danger)':a.score>25?'var(--warn)':'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp;
+             <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp;
+             <b>Reports:</b> ${a.reports} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor ? 'Yes':'No'}`;
+  } else {
+    html += `<span style="color:var(--muted)">AbuseIPDB: not configured (add ABUSEIPDB_KEY to .env)</span>`;
+  }
+  body.innerHTML = html;
+}
+
+async function blockCurrentIP() {
+  if (!currentIP) return;
+  await apiFetch(`${API}/blocklist/add`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ip: currentIP}) });
+  toast(currentIP + ' added to blocklist', 'ok');
+}
+
+// ─── Live Alerts ─────────────────────────────────────────────────────────────
+
+async function loadAlerts() {
+  const hot = await apiFetch(`${API}/hot-ips`);
+  if (!hot) return;
+
+  const allEvents = [];
+  for (const h of hot.slice(0, 15)) {
+    const trail = await apiFetch(`${API}/trail/${h.ip}?limit=20`);
+    if (trail && trail.events) {
+      trail.events.forEach(e => allEvents.push({ ...e, _ip: h.ip }));
+    }
+  }
+  allEvents.sort((a,b) => (b.ts||'').localeCompare(a.ts||''));
+
+  const tbody = document.getElementById('alerts-table');
+  tbody.innerHTML = allEvents.slice(0, 100).map(e => `<tr>
+    <td style="font-size:11px">${(e.ts||'').substring(0,19).replace('T',' ')}</td>
+    <td style="color:var(--accent);cursor:pointer" onclick="loadIPDetail('${e._ip}')">${e._ip}</td>
+    <td>${(e.threat_type||'').replace(/_/g,' ')}</td>
+    <td style="font-size:11px;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.rule||''}">${(e.rule||'').substring(0,60)}</td>
+    <td><span class="badge ${e.severity||'low'}">${e.severity||'low'}</span></td>
+    <td style="font-size:11px">${e.dst_ip||'—'}</td>
+  </tr>`).join('');
+}
+
+// ─── ML ──────────────────────────────────────────────────────────────────────
+
+async function trainModel() {
+  document.getElementById('train-status').textContent = 'Training…';
+  const r = await apiFetch(`${MLAPI}/train`, { method:'POST' });
+  if (r) {
+    document.getElementById('train-status').textContent = `Trained on ${r.ip_count} IPs · ${r.anomalies} anomalies found`;
+    toast('Model trained successfully!', 'ok');
+    await loadAnomalies();
+  }
+}
+
+async function scoreIP() {
+  const ip = document.getElementById('ml-ip-input').value.trim();
+  if (!ip) return;
+  const r = await apiFetch(`${MLAPI}/score/${ip}`);
+  if (!r) return;
+
+  const panel = document.getElementById('ml-score-panel');
+  const body  = document.getElementById('ml-score-body');
+  panel.style.display = 'block';
+
+  const riskColor = r.risk_score > 70 ? 'var(--danger)' : r.risk_score > 40 ? 'var(--warn)' : 'var(--ok)';
+  body.innerHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+      <div><div style="font-size:11px;color:var(--muted)">Risk score</div><div style="font-size:32px;font-weight:700;color:${riskColor}">${r.risk_score??'—'}/100</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Anomaly score</div><div style="font-size:32px;font-weight:700">${r.anomaly_score??'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Is anomaly</div><div style="font-size:20px;font-weight:700;color:${r.is_anomaly?'var(--danger)':'var(--ok)'}">${r.is_anomaly?'YES':'No'}</div></div>
+    </div>
+    ${r.features ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:2">
+      Events: ${r.features.n_events} &nbsp;|&nbsp;
+      Rate: ${r.features.event_rate_pm}/min &nbsp;|&nbsp;
+      Unique dst IPs: ${r.features.unique_dst_ips} &nbsp;|&nbsp;
+      Brute force: ${r.features.brute_force_cnt} &nbsp;|&nbsp;
+      DB scans: ${r.features.db_scan_cnt}
+    </div>` : ''}`;
+}
+
+async function loadAnomalies() {
+  const r = await apiFetch(`${MLAPI}/anomalies`);
+  if (!r) return;
+  const tbody = document.getElementById('anomaly-table');
+  if (!r.anomalies.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">No anomalies detected — train the model first</td></tr>';
+    return;
+  }
+  tbody.innerHTML = r.anomalies.map(a => `<tr onclick="loadIPDetail('${a.ip}')" style="cursor:pointer">
+    <td style="color:var(--accent)">${a.ip}</td>
+    <td><span style="color:${a.risk_score>70?'var(--danger)':a.risk_score>40?'var(--warn)':'var(--ok)'};font-weight:700">${a.risk_score??'—'}</span>/100</td>
+    <td style="color:var(--muted)">${a.anomaly_score??'—'}</td>
+    <td><span class="badge ${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}">${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}</span></td>
+  </tr>`).join('');
+}
+
+// ─── Clusters ────────────────────────────────────────────────────────────────
+
+async function loadClusters() {
+  const r = await apiFetch(`${MLAPI}/clusters`);
+  if (!r) return;
+  const panel = document.getElementById('clusters-panel');
+  if (!r.clusters.length) {
+    panel.innerHTML = '<div class="card"><div class="card-body" style="color:var(--muted)">No coordinated clusters found — ingest logs first</div></div>';
+    return;
+  }
+  const maxEvts = Math.max(...r.clusters.map(c => c.total_events));
+  panel.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">Coordinated attack clusters</span><span style="font-size:11px;color:var(--muted)">${r.clusters.length} clusters across ${r.total_subnets} subnets</span></div>
+      <div class="card-body">
+        ${r.clusters.map(c => `
+          <div class="cluster-card">
+            <div>
+              <div class="cluster-subnet">${c.subnet}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">${c.ip_count} IPs</div>
+            </div>
+            <div class="cluster-bar-bg">
+              <div class="cluster-bar" style="width:${Math.round(c.total_events/maxEvts*100)}%;background:${c.threat_level==='critical'?'var(--danger)':c.threat_level==='high'?'var(--warn)':'var(--accent)'}"></div>
+            </div>
+            <div class="cluster-count">${c.total_events.toLocaleString()} events</div>
+            <span class="badge ${c.threat_level}">${c.threat_level}</span>
+          </div>
+          <div style="padding:0 12px 8px;font-size:11px;color:var(--muted);font-family:var(--mono)">${c.ips.join(', ')}</div>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+// ─── Blocklist ───────────────────────────────────────────────────────────────
+
+async function loadBlocklist() {
+  const r = await apiFetch(`${API}/blocklist`);
+  if (!r) return;
+  document.getElementById('block-count').textContent = r.count + ' IPs';
+  const body = document.getElementById('blocklist-body');
+  if (!r.ips.length) {
+    body.innerHTML = '<div style="color:var(--muted);font-size:12px">No IPs blocked yet</div>';
+    return;
+  }
+  body.innerHTML = r.ips.map(ip => `
+    <div class="block-row">
+      <span class="block-ip">${ip}</span>
+      <span class="block-src">auto</span>
+      <button class="btn" style="font-size:10px;padding:3px 8px" onclick="unblock('${ip}')">Unblock</button>
+      <button class="btn" style="font-size:10px;padding:3px 8px" onclick="loadIPDetail('${ip}')">Trail</button>
+    </div>`).join('');
+}
+
+async function manualBlock() {
+  const ip = document.getElementById('block-ip-input').value.trim();
+  if (!ip) return;
+  await apiFetch(`${API}/blocklist/add`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ip}) });
+  toast(ip + ' blocked', 'ok');
+  document.getElementById('block-ip-input').value = '';
+  await loadBlocklist();
+}
+
+async function unblock(ip) {
+  await apiFetch(`${API}/blocklist/${ip}`, { method:'DELETE' });
+  toast(ip + ' unblocked', 'warn');
+  await loadBlocklist();
+}
+
+// ─── Ingest ──────────────────────────────────────────────────────────────────
+
+function dragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
+function dragLeave()  { document.getElementById('drop-zone').classList.remove('drag'); }
+function dropFile(e)  { e.preventDefault(); dragLeave(); const f = e.dataTransfer.files[0]; if(f) uploadCSV(f); }
+
+async function uploadCSV(file) {
+  if (!file) return;
+  const wrap = document.getElementById('progress-wrap');
+  const bar  = document.getElementById('progress-bar');
+  const stat = document.getElementById('upload-status');
+  wrap.style.display = 'block';
+  bar.style.width = '30%';
+  stat.textContent = `Uploading ${file.name} (${(file.size/1024).toFixed(0)} KB)…`;
+
+  const fd = new FormData();
+  fd.append('file', file);
+  bar.style.width = '60%';
+
+  const r = await apiFetch(`${API}/ingest/csv`, { method:'POST', body: fd });
+  bar.style.width = '100%';
+  if (r) {
+    stat.textContent = `Ingesting ${r.rows.toLocaleString()} rows in background…`;
+    toast(`Ingestion started: ${r.rows} rows`, 'ok');
+    setTimeout(() => { bar.style.width='0%'; wrap.style.display='none'; }, 2000);
+    setTimeout(refreshAll, 5000);
+  }
+}
+
+async function ingestSingleLog() {
+  const raw = document.getElementById('json-log').value.trim();
+  if (!raw) return;
+  try {
+    const log = JSON.parse(raw);
+    const r = await apiFetch(`${API}/ingest/log`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(log) });
+    if (r) { toast('Log ingested', 'ok'); setTimeout(refreshAll, 1000); }
+  } catch(e) {
+    toast('Invalid JSON: ' + e.message, 'err');
+  }
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+refreshAll();
+// Auto-refresh every 30 seconds
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
