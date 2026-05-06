@@ -2,804 +2,1017 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>CyberSentinel — Threat Intelligence Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CyberSentinel v2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-:root {
-  --bg:       #0d1117;
-  --bg2:      #161b22;
-  --bg3:      #21262d;
-  --border:   #30363d;
-  --text:     #e6edf3;
-  --muted:    #8b949e;
-  --accent:   #58a6ff;
-  --danger:   #f85149;
-  --warn:     #e3b341;
-  --ok:       #3fb950;
-  --purple:   #bc8cff;
-  --mono:     'Courier New', monospace;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
-a { color: var(--accent); text-decoration: none; }
-
-/* ── Layout ── */
-.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
-.sidebar { background: var(--bg2); border-right: 1px solid var(--border); padding: 0; display: flex; flex-direction: column; }
-.main { overflow-y: auto; }
-
-/* ── Sidebar ── */
-.logo { padding: 16px 20px; border-bottom: 1px solid var(--border); }
-.logo-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
-.logo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.nav { padding: 12px 0; flex: 1; }
-.nav-section { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 20px 4px; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 20px; cursor: pointer; color: var(--muted); font-size: 13px; border-left: 2px solid transparent; }
-.nav-item:hover { background: var(--bg3); color: var(--text); }
-.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(88,166,255,.06); }
-.nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-.nav-dot.danger { background: var(--danger); }
-.nav-dot.ok { background: var(--ok); }
-.nav-dot.warn { background: var(--warn); }
-.sidebar-footer { padding: 12px 20px; border-top: 1px solid var(--border); }
-.status-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-
-/* ── Topbar ── */
-.topbar { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--bg2); position: sticky; top: 0; z-index: 10; }
-.topbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
-.search-wrap { display: flex; align-items: center; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; flex: 1; max-width: 320px; }
-.search-wrap input { background: none; border: none; outline: none; color: var(--text); font-size: 13px; flex: 1; }
-.search-wrap input::placeholder { color: var(--muted); }
-.btn { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 12px; cursor: pointer; transition: background .15s; }
-.btn:hover { background: var(--border); }
-.btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
-.btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
-
-/* ── Pages ── */
-.page { display: none; padding: 24px; }
-.page.active { display: block; }
-
-/* ── Metric grid ── */
-.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.metric { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-.metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
-.metric-val { font-size: 28px; font-weight: 700; }
-.metric-val.danger { color: var(--danger); }
-.metric-val.warn   { color: var(--warn); }
-.metric-val.ok     { color: var(--ok); }
-.metric-val.accent { color: var(--accent); }
-.metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-
-/* ── Cards ── */
-.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; }
-.card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.card-title { font-size: 13px; font-weight: 600; }
-.card-body { padding: 16px; }
-
-/* ── Table ── */
-.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
-.tbl th { text-align: left; padding: 8px 12px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 500; font-size: 11px; text-transform: uppercase; }
-.tbl td { padding: 9px 12px; border-bottom: 1px solid rgba(48,54,61,.5); font-family: var(--mono); }
-.tbl tr:hover td { background: var(--bg3); }
-.tbl tr:last-child td { border-bottom: none; }
-
-/* ── Badges ── */
-.badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 12px; text-transform: uppercase; letter-spacing: .04em; }
-.badge.critical { background: rgba(248,81,73,.18); color: #f85149; }
-.badge.high     { background: rgba(227,179,65,.18); color: #e3b341; }
-.badge.medium   { background: rgba(88,166,255,.18); color: #58a6ff; }
-.badge.low      { background: rgba(63,185,80,.18); color: #3fb950; }
-.badge.blocked  { background: rgba(188,140,255,.18); color: #bc8cff; }
-
-/* ── IP Trail ── */
-.trail-list { max-height: 480px; overflow-y: auto; }
-.trail-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(48,54,61,.4); }
-.trail-item:last-child { border-bottom: none; }
-.trail-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
-.trail-dot.critical { background: var(--danger); }
-.trail-dot.high     { background: var(--warn); }
-.trail-dot.medium   { background: var(--accent); }
-.trail-dot.low      { background: var(--ok); }
-.trail-ts { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 165px; flex-shrink: 0; }
-.trail-desc { font-size: 12px; color: var(--muted); flex: 1; line-height: 1.5; }
-.trail-desc b { color: var(--text); font-weight: 500; }
-.trail-badge-wrap { flex-shrink: 0; }
-
-/* ── Chart wrappers ── */
-.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.chart-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-.chart-box h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .06em; }
-.chart-wrap { position: relative; height: 220px; }
-
-/* ── Upload zone ── */
-.upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s; }
-.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); }
-.upload-zone h3 { color: var(--text); margin-bottom: 8px; }
-.upload-zone p  { color: var(--muted); font-size: 12px; }
-.progress-wrap { background: var(--bg3); border-radius: 4px; height: 6px; margin-top: 12px; overflow: hidden; display: none; }
-.progress-bar  { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
-
-/* ── Blocklist ── */
-.block-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,.4); }
-.block-ip  { font-family: var(--mono); font-size: 12px; flex: 1; }
-.block-src { font-size: 11px; color: var(--muted); min-width: 70px; }
-
-/* ── IP detail panel ── */
-.ip-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-.ip-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-.ip-addr-big { font-family: var(--mono); font-size: 20px; font-weight: 700; }
-.ip-meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.ip-meta { background: var(--bg3); border-radius: 6px; padding: 10px; }
-.ip-meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
-.ip-meta-val   { font-size: 15px; font-weight: 600; }
-
-/* ── Cluster map ── */
-.cluster-card { background: var(--bg3); border-radius: 6px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-.cluster-subnet { font-family: var(--mono); font-size: 13px; font-weight: 600; min-width: 140px; }
-.cluster-bar-bg { flex: 1; height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; }
-.cluster-bar    { height: 100%; border-radius: 3px; }
-.cluster-count  { font-size: 12px; color: var(--muted); min-width: 80px; text-align: right; }
-
-/* ── Toast ── */
-.toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
-.toast { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 10px 16px; font-size: 12px; animation: slideIn .2s ease; max-width: 320px; }
-.toast.ok   { border-left: 3px solid var(--ok); }
-.toast.err  { border-left: 3px solid var(--danger); }
-.toast.warn { border-left: 3px solid var(--warn); }
-@keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--danger:#f85149;--warn:#e3b341;--ok:#3fb950;--purple:#bc8cff;--mono:'Courier New',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.main{overflow-y:auto}
+.logo{padding:16px 20px;border-bottom:1px solid var(--border)}
+.logo-title{font-size:16px;font-weight:700}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.nav{padding:12px 0;flex:1}
+.ns{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 20px 4px}
+.ni{display:flex;align-items:center;gap:10px;padding:8px 20px;cursor:pointer;color:var(--muted);font-size:13px;border-left:2px solid transparent}
+.ni:hover{background:var(--bg3);color:var(--text)}
+.ni.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.06)}
+.ndot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.nd-r{background:var(--danger)}.nd-w{background:var(--warn)}.nd-g{background:var(--ok)}.nd-p{background:var(--purple)}
+.sfooter{padding:12px 20px;border-top:1px solid var(--border)}
+.srow{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:4px}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:10}
+.topbar h1{font-size:16px;font-weight:600;flex:1}
+.srch{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 12px;flex:1;max-width:300px}
+.srch input{background:none;border:none;outline:none;color:var(--text);font-size:13px;flex:1}
+.srch input::placeholder{color:var(--muted)}
+.btn{padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer}
+.btn:hover{background:var(--border)}
+.btn.pri{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+.btn.red{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn.yel{background:var(--warn);color:#000;border-color:var(--warn)}
+.page{display:none;padding:24px}.page.active{display:block}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:24px}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px}
+.mlabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.mval{font-size:28px;font-weight:700}
+.mv-a{color:var(--accent)}.mv-d{color:var(--danger)}.mv-w{color:var(--warn)}.mv-g{color:var(--ok)}.mv-p{color:var(--purple)}
+.msub{font-size:11px;color:var(--muted);margin-top:4px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:16px}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.ct{font-size:13px;font-weight:600}
+.cb{padding:16px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:8px 12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;font-size:11px;text-transform:uppercase}
+.tbl td{padding:9px 12px;border-bottom:1px solid rgba(48,54,61,.5);font-family:var(--mono)}
+.tbl tr:hover td{background:var(--bg3)}
+.tbl tr:last-child td{border-bottom:none}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:12px;text-transform:uppercase}
+.badge.critical{background:rgba(248,81,73,.18);color:#f85149}
+.badge.high{background:rgba(227,179,65,.18);color:#e3b341}
+.badge.medium{background:rgba(88,166,255,.18);color:#58a6ff}
+.badge.low{background:rgba(63,185,80,.18);color:#3fb950}
+.badge.blocked{background:rgba(188,140,255,.18);color:#bc8cff}
+.cg2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.cg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.cbox{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px}
+.cbox h3{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em}
+.cwrap{position:relative;height:200px}
+.tlist{max-height:460px;overflow-y:auto}
+.ti{display:flex;align-items:flex-start;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(48,54,61,.4)}
+.ti:last-child{border-bottom:none}
+.tdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.tdot.critical{background:var(--danger)}.tdot.high{background:var(--warn)}.tdot.medium{background:var(--accent)}.tdot.low{background:var(--ok)}
+.tts{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:140px;flex-shrink:0}
+.tdesc{font-size:12px;color:var(--muted);flex:1;line-height:1.5}
+.tdesc b{color:var(--text);font-weight:500}
+.ip-panel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.ip-hdr{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.ip-big{font-family:var(--mono);font-size:20px;font-weight:700}
+.ip-mg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.ipm{background:var(--bg3);border-radius:6px;padding:10px}
+.ipm-l{font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.ipm-v{font-size:15px;font-weight:600}
+.dev-row{display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-bottom:1px solid rgba(48,54,61,.4)}
+.dev-row:last-child{border-bottom:none}
+.dev-ip{font-family:var(--mono);font-size:12px;color:var(--accent);min-width:130px;flex-shrink:0;cursor:pointer}
+.dev-type{font-size:11px;font-family:var(--mono);min-width:180px;flex-shrink:0}
+.dev-msg{font-size:12px;color:var(--muted);flex:1;line-height:1.4}
+.dev-ts{font-size:10px;color:var(--muted);min-width:65px;text-align:right}
+.bsl-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.bsl-box{background:var(--bg3);border-radius:8px;padding:12px;text-align:center}
+.bsl-box-val{font-size:24px;font-weight:700;margin-bottom:4px}
+.bsl-box-lbl{font-size:11px;color:var(--muted)}
+.bsl-section{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .4rem}
+.bsl-tags{display:flex;gap:6px;flex-wrap:wrap}
+.bsl-tag{font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(88,166,255,.12);color:var(--accent)}
+.bsl-tag.warn{background:rgba(227,179,65,.12);color:var(--warn)}
+.bsl-tag.ok{background:rgba(63,185,80,.12);color:var(--ok)}
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;cursor:pointer;transition:border-color .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent)}
+.prog-wrap{background:var(--bg3);border-radius:4px;height:6px;margin-top:12px;overflow:hidden;display:none}
+.prog-bar{height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 16px;font-size:12px;animation:slideIn .2s ease;max-width:300px}
+.toast.ok{border-left:3px solid var(--ok)}.toast.err{border-left:3px solid var(--danger)}.toast.warn{border-left:3px solid var(--warn)}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+.empty{padding:24px;text-align:center;color:var(--muted);font-size:12px}
+.alert-card{background:var(--bg3);border-radius:8px;margin:8px 16px;padding:12px 14px;border-left:3px solid var(--border)}
+.alert-card.critical{border-left-color:var(--danger)}
+.alert-card.high{border-left-color:var(--warn)}
+.alert-card.medium{border-left-color:var(--accent)}
+.alert-card.low{border-left-color:var(--ok)}
+.alert-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.alert-type-label{font-size:12px;font-weight:700;font-family:var(--mono)}
+.alert-ip-label{font-family:var(--mono);font-size:12px;color:var(--accent);cursor:pointer;margin-right:auto}
+.alert-time{font-size:10px;color:var(--muted)}
+.alert-message{font-size:12px;color:var(--text);margin-bottom:6px;line-height:1.5}
+.alert-why{font-size:11px;color:var(--muted);line-height:1.6;background:var(--bg2);border-radius:5px;padding:7px 10px;margin-bottom:6px;border:.5px solid var(--border)}
+.alert-why b{color:var(--warn)}
+.alert-action{font-size:11px;font-weight:600;padding:3px 0}
+.alert-action.critical{color:var(--danger)}
+.alert-action.high{color:var(--warn)}
+.alert-action.medium{color:var(--accent)}
+.alert-action.low{color:var(--ok)}
+.alert-details{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px}
+.alert-detail-chip{font-size:10px;font-family:var(--mono);padding:1px 7px;border-radius:4px;background:var(--bg2);color:var(--muted);border:.5px solid var(--border)}
+.ml-explain{margin-top:14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:13px 14px}
+.ml-explain-title{font-size:12px;font-weight:700;margin-bottom:7px;color:var(--text)}
+.ml-explain p{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px}
+.ml-driver-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:10px}
+.ml-driver{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.5;color:var(--muted)}
+.ml-driver b{color:var(--text)}
+.ml-driver.critical{border-left:3px solid var(--danger)}
+.ml-driver.high{border-left:3px solid var(--warn)}
+.ml-driver.medium{border-left:3px solid var(--accent)}
+.ml-formula{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg2);border-radius:5px;padding:7px 9px;border:1px solid var(--border)}
+.term-panel{background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.22);border-radius:8px;padding:13px 15px;margin-bottom:16px}
+.term-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px}
+.term-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.term{font-size:12px;color:var(--muted);line-height:1.55;background:rgba(13,17,23,.45);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.term b{color:var(--accent)}
+.ip-chip{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(248,81,73,.12);color:var(--danger);margin:2px;cursor:pointer}
+.ip-chip:hover{background:rgba(248,81,73,.25)}
 </style>
 </head>
 <body>
-
 <div class="shell">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="logo">
-      <div class="logo-title">CyberSentinel</div>
-      <div class="logo-sub">Threat Intelligence Platform</div>
-    </div>
-    <nav class="nav">
-      <div class="nav-section">Monitor</div>
-      <div class="nav-item active" onclick="showPage('overview')"><span class="nav-dot danger"></span>Overview</div>
-      <div class="nav-item" onclick="showPage('trail')"><span class="nav-dot warn"></span>IP Trail</div>
-      <div class="nav-item" onclick="showPage('alerts')"><span class="nav-dot danger"></span>Live Alerts</div>
-      <div class="nav-section">Detection</div>
-      <div class="nav-item" onclick="showPage('ml')"><span class="nav-dot ok"></span>ML Anomaly</div>
-      <div class="nav-item" onclick="showPage('clusters')"><span class="nav-dot warn"></span>Subnet Clusters</div>
-      <div class="nav-section">Control</div>
-      <div class="nav-item" onclick="showPage('blocklist')"><span class="nav-dot danger"></span>Blocklist</div>
-      <div class="nav-item" onclick="showPage('ingest')"><span class="nav-dot ok"></span>Ingest Logs</div>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="status-row"><span class="pulse"></span>Backend API</div>
-      <div class="status-row" id="mlstatus"><span style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span>ML Engine</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:8px" id="last-refresh">—</div>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <main class="main">
-    <div class="topbar">
-      <h1 id="page-title">Overview</h1>
-      <div class="search-wrap">
-        <svg width="14" height="14" fill="none" stroke="var(--muted)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
-        <input id="ip-search" placeholder="Search IP address…" onkeydown="if(event.key==='Enter')searchIP()"/>
-      </div>
-      <button class="btn" onclick="searchIP()">Search</button>
-      <button class="btn primary" onclick="refreshAll()">↻ Refresh</button>
-    </div>
-
-    <!-- OVERVIEW -->
-    <div id="page-overview" class="page active">
-      <div class="metric-grid" id="metric-grid">
-        <div class="metric"><div class="metric-label">Total logs</div><div class="metric-val accent" id="m-total">—</div><div class="metric-sub">ingested</div></div>
-        <div class="metric"><div class="metric-label">Unique IPs</div><div class="metric-val accent" id="m-ips">—</div><div class="metric-sub">tracked</div></div>
-        <div class="metric"><div class="metric-label">Hot IPs</div><div class="metric-val danger" id="m-hot">—</div><div class="metric-sub">critical/high severity</div></div>
-        <div class="metric"><div class="metric-label">Auto-blocked</div><div class="metric-val warn" id="m-blocked">—</div><div class="metric-sub">bad subnets</div></div>
-        <div class="metric"><div class="metric-label">Brute force</div><div class="metric-val danger" id="m-bf">—</div><div class="metric-sub">events</div></div>
-        <div class="metric"><div class="metric-label">Known malicious</div><div class="metric-val danger" id="m-km">—</div><div class="metric-sub">Dshield / Spamhaus</div></div>
-      </div>
-
-      <div class="chart-grid">
-        <div class="chart-box">
-          <h3>Threat distribution</h3>
-          <div class="chart-wrap"><canvas id="chart-threat" role="img" aria-label="Threat type distribution pie chart"></canvas></div>
-        </div>
-        <div class="chart-box">
-          <h3>Top hot IPs by events</h3>
-          <div class="chart-wrap"><canvas id="chart-hotips" role="img" aria-label="Top hot IPs bar chart"></canvas></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Hot IPs — critical &amp; high severity actors</span><span id="hot-count" style="font-size:11px;color:var(--muted)"></span></div>
-        <div class="card-body" style="padding:0">
-          <table class="tbl">
-            <thead><tr><th>IP Address</th><th>Events</th><th>First seen</th><th>Last seen</th><th>Top threat</th><th>Severity</th><th>Actions</th></tr></thead>
-            <tbody id="hot-ip-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- IP TRAIL -->
-    <div id="page-trail" class="page">
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-body" style="display:flex;gap:10px">
-          <input id="trail-ip-input" placeholder="Enter IP address (e.g. 85.11.187.36)" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-          <button class="btn primary" onclick="loadTrail()">Load trail</button>
-          <button class="btn" onclick="loadTrailIntel()">+ Intel</button>
-        </div>
-      </div>
-
-      <div id="trail-summary-panel" style="display:none">
-        <div class="ip-panel">
-          <div class="ip-header">
-            <div class="ip-addr-big" id="ts-ip">—</div>
-            <span class="badge" id="ts-badge">—</span>
-            <span id="ts-block-badge" style="display:none" class="badge blocked">Blocked</span>
-          </div>
-          <div class="ip-meta-grid">
-            <div class="ip-meta"><div class="ip-meta-label">Total events</div><div class="ip-meta-val accent" id="ts-total">—</div></div>
-            <div class="ip-meta"><div class="ip-meta-label">First seen</div><div class="ip-meta-val" style="font-size:11px;font-family:var(--mono)" id="ts-first">—</div></div>
-            <div class="ip-meta"><div class="ip-meta-label">Last seen</div><div class="ip-meta-val" style="font-size:11px;font-family:var(--mono)" id="ts-last">—</div></div>
-            <div class="ip-meta"><div class="ip-meta-label">Top threat</div><div class="ip-meta-val" id="ts-threat">—</div></div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap" id="ts-threat-badges"></div>
-        </div>
-
-        <div id="intel-panel" style="display:none" class="card">
-          <div class="card-header"><span class="card-title">Threat intel</span></div>
-          <div class="card-body" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.8"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Event trail — chronological</span>
-            <div style="display:flex;gap:8px">
-              <button class="btn" style="font-size:11px" onclick="blockCurrentIP()">Block IP</button>
-            </div>
-          </div>
-          <div class="trail-list" id="trail-events"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- LIVE ALERTS -->
-    <div id="page-alerts" class="page">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-        <span style="font-size:12px;color:var(--muted)">Showing hot IP events</span>
-        <button class="btn" onclick="loadAlerts()">↻ Refresh</button>
-      </div>
-      <div class="card">
-        <div class="card-body" style="padding:0">
-          <table class="tbl">
-            <thead><tr><th>Time</th><th>Source IP</th><th>Threat type</th><th>Rule</th><th>Severity</th><th>Dst IP</th></tr></thead>
-            <tbody id="alerts-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ML ANOMALY -->
-    <div id="page-ml" class="page">
-      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-        <button class="btn primary" onclick="trainModel()">Train ML model</button>
-        <button class="btn" onclick="loadAnomalies()">Load anomalies</button>
-        <div id="train-status" style="font-size:12px;color:var(--muted);align-self:center"></div>
-      </div>
-
-      <div style="display:flex;gap:12px;margin-bottom:16px">
-        <input id="ml-ip-input" placeholder="Score a specific IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-        <button class="btn" onclick="scoreIP()">Score IP</button>
-      </div>
-
-      <div id="ml-score-panel" style="display:none" class="card">
-        <div class="card-header"><span class="card-title">IP Risk Score</span></div>
-        <div class="card-body" id="ml-score-body"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Detected anomalies — Isolation Forest</span></div>
-        <div class="card-body" style="padding:0">
-          <table class="tbl">
-            <thead><tr><th>IP Address</th><th>Risk score</th><th>Anomaly score</th><th>Status</th></tr></thead>
-            <tbody id="anomaly-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- SUBNET CLUSTERS -->
-    <div id="page-clusters" class="page">
-      <div style="margin-bottom:16px">
-        <button class="btn primary" onclick="loadClusters()">Analyse clusters</button>
-        <span style="font-size:12px;color:var(--muted);margin-left:12px">Detects coordinated attack groups by shared /24 subnet</span>
-      </div>
-      <div id="clusters-panel"></div>
-    </div>
-
-    <!-- BLOCKLIST -->
-    <div id="page-blocklist" class="page">
-      <div style="display:flex;gap:10px;margin-bottom:16px">
-        <input id="block-ip-input" placeholder="Manually block an IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-        <button class="btn danger" onclick="manualBlock()">Block</button>
-        <button class="btn" onclick="loadBlocklist()">↻ Refresh</button>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Active blocklist</span><span id="block-count" style="font-size:11px;color:var(--muted)"></span></div>
-        <div class="card-body" id="blocklist-body"></div>
-      </div>
-    </div>
-
-    <!-- INGEST -->
-    <div id="page-ingest" class="page">
-      <div class="card">
-        <div class="card-header"><span class="card-title">Upload CSV log file</span></div>
-        <div class="card-body">
-          <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()" ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave()">
-            <h3>Drop your CSV file here</h3>
-            <p>or click to browse — supports CyberSentinel log exports</p>
-            <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="uploadCSV(this.files[0])"/>
-          </div>
-          <div class="progress-wrap" id="progress-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
-          <div id="upload-status" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Or paste a single JSON log event</span></div>
-        <div class="card-body">
-          <textarea id="json-log" rows="6" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;resize:vertical" placeholder='{"@timestamp":"2026-04-22T09:29:52Z","rule.description":"Fortigate: Login failed.","data.ui":"85.11.187.36","rule.id":"81606","data.action":"login","data.level":"alert"}'></textarea>
-          <button class="btn primary" style="margin-top:10px" onclick="ingestSingleLog()">Ingest log</button>
-        </div>
-      </div>
-    </div>
-
-  </main>
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-title">CyberSentinel</div>
+    <div class="logo-sub">Threat Intelligence v2.0</div>
+  </div>
+  <nav class="nav">
+    <div class="ns">Monitor</div>
+    <div class="ni active" onclick="nav('overview')"><span class="ndot nd-r"></span>Overview</div>
+    <div class="ni" onclick="nav('trail')"><span class="ndot nd-w"></span>IP Trail</div>
+    <div class="ni" onclick="nav('livealerts')"><span class="ndot nd-r"></span>Live Alerts</div>
+    <div class="ns">Baselines</div>
+    <div class="ni" onclick="nav('deviations')"><span class="ndot nd-r"></span>Deviations</div>
+    <div class="ni" onclick="nav('bslexplorer')"><span class="ndot nd-w"></span>Baseline Explorer</div>
+    <div class="ns">Detection</div>
+    <div class="ni" onclick="nav('ml')"><span class="ndot nd-g"></span>ML Anomaly</div>
+    <div class="ni" onclick="nav('clusters')"><span class="ndot nd-w"></span>Subnet Clusters</div>
+    <div class="ns">Control</div>
+    <div class="ni" onclick="nav('blocklist')"><span class="ndot nd-r"></span>Blocklist</div>
+    <div class="ni" onclick="nav('ingest')"><span class="ndot nd-g"></span>Ingest Logs</div>
+  </nav>
+  <div class="sfooter">
+    <div class="srow"><span class="pulse"></span>Backend API</div>
+    <div class="srow" id="ml-status"><span style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> ML Engine</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px" id="last-ref">—</div>
+  </div>
+</aside>
+<main class="main">
+<div class="topbar">
+  <h1 id="page-title">Overview</h1>
+  <div class="srch">
+    <svg width="13" height="13" fill="none" stroke="var(--muted)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
+    <input id="ip-search" placeholder="Search IP…" onkeydown="if(event.key==='Enter')doSearch()"/>
+  </div>
+  <button class="btn" onclick="doSearch()">Search</button>
+  <button class="btn pri" onclick="refreshAll()">↻ Refresh</button>
 </div>
-
+<div id="page-overview" class="page active">
+  <div class="mg">
+    <div class="metric"><div class="mlabel">Total logs</div><div class="mval mv-a" id="m-total">—</div><div class="msub">ingested</div></div>
+    <div class="metric"><div class="mlabel">Unique IPs</div><div class="mval mv-a" id="m-ips">—</div><div class="msub">tracked</div></div>
+    <div class="metric"><div class="mlabel">Hot IPs</div><div class="mval mv-d" id="m-hot">—</div><div class="msub">high/critical</div></div>
+    <div class="metric"><div class="mlabel">Baseline alerts</div><div class="mval mv-d" id="m-balerts">—</div><div class="msub">deviations fired</div></div>
+    <div class="metric"><div class="mlabel">Critical IPs</div><div class="mval mv-d" id="m-crit">—</div><div class="msub">P0 flagged</div></div>
+    <div class="metric"><div class="mlabel">Auto-blocked</div><div class="mval mv-w" id="m-blocked">—</div><div class="msub">bad subnets</div></div>
+  </div>
+  <div class="cg2">
+    <div class="cbox"><h3>Threat types</h3><div class="cwrap"><canvas id="ch-threats"></canvas></div></div>
+    <div class="cbox"><h3>Baseline deviation types</h3><div class="cwrap"><canvas id="ch-devtypes"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Hot IPs</span><span id="hot-count" style="font-size:11px;color:var(--muted)"></span></div>
+    <table class="tbl">
+      <thead><tr><th>IP</th><th>Events</th><th>First seen</th><th>Last seen</th><th>Top threat</th><th>Severity</th><th></th></tr></thead>
+      <tbody id="hot-tbody"></tbody>
+    </table>
+  </div>
+</div>
+<div id="page-trail" class="page">
+  <div class="card" style="margin-bottom:16px">
+    <div class="cb" style="display:flex;gap:10px">
+      <input id="trail-input" placeholder="Enter IP (e.g. 85.11.187.36)" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+      <button class="btn pri" onclick="loadTrail()">Load trail</button>
+      <button class="btn" onclick="loadIntel()">+ Intel</button>
+      <button class="btn yel" onclick="loadBaseline()">Baseline</button>
+      <button class="btn red" onclick="blockCurrent()">Block IP</button>
+    </div>
+  </div>
+  <div id="trail-panel" style="display:none">
+    <div class="ip-panel">
+      <div class="ip-hdr">
+        <div class="ip-big" id="t-ip">—</div>
+        <span class="badge" id="t-sev-badge">—</span>
+        <span id="t-blocked-badge" style="display:none" class="badge blocked">Blocked</span>
+      </div>
+      <div class="ip-mg">
+        <div class="ipm"><div class="ipm-l">Total events</div><div class="ipm-v mv-a" id="t-total">—</div></div>
+        <div class="ipm"><div class="ipm-l">First seen</div><div class="ipm-v" style="font-size:11px;font-family:var(--mono)" id="t-first">—</div></div>
+        <div class="ipm"><div class="ipm-l">Last seen</div><div class="ipm-v" style="font-size:11px;font-family:var(--mono)" id="t-last">—</div></div>
+        <div class="ipm"><div class="ipm-l">Top threat</div><div class="ipm-v" id="t-threat">—</div></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="t-badges"></div>
+    </div>
+    <div id="intel-panel" style="display:none" class="card">
+      <div class="ch"><span class="ct">Threat Intel</span></div>
+      <div class="cb" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
+    </div>
+    <div id="bsl-panel" style="display:none" class="card">
+      <div class="ch"><span class="ct">Baseline Profile</span><span id="bsl-alert-count" style="font-size:11px;color:var(--danger)"></span></div>
+      <div class="cb" id="bsl-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">Event trail — chronological</span></div>
+      <div class="tlist" id="trail-events"></div>
+    </div>
+  </div>
+</div>
+<div id="page-livealerts" class="page">
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <button class="btn" onclick="loadLiveAlerts()">↻ Refresh</button>
+    <span style="font-size:12px;color:var(--muted);align-self:center">Events from hot IPs</span>
+  </div>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>Time</th><th>Source IP</th><th>Threat</th><th>Rule</th><th>Severity</th><th>Dst IP</th></tr></thead>
+      <tbody id="live-tbody"></tbody>
+    </table>
+  </div>
+</div>
+<div id="page-deviations" class="page">
+  <div class="term-panel">
+    <div class="term-title">What baseline deviation means</div>
+    <div class="term-grid">
+      <div class="term"><b>Baseline</b> is the normal behaviour learned for an IP: usual ports, hours, destination networks, countries, event volume, and alert types.</div>
+      <div class="term"><b>Deviation</b> means the IP did something outside that normal pattern, like touching a new subnet, using a new admin port, or creating a volume spike.</div>
+      <div class="term"><b>Why SOC cares</b>: deviations are early warning signals for brute force, lateral movement, proxy rotation, or compromised accounts.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn pri" onclick="loadDeviations()">Load all deviations</button>
+    <button class="btn red" onclick="loadDeviations('critical')">Critical only</button>
+    <button class="btn yel" onclick="loadDeviations('high')">High only</button>
+    <button class="btn" onclick="buildAllBaselines()">↻ Rebuild all baselines</button>
+    <span id="dev-status" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><span class="ct">IPs with deviations — click to trail</span><span id="dev-ip-count" style="font-size:11px;color:var(--muted)"></span></div>
+    <div class="cb" id="dev-ip-chips" style="min-height:40px"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">All deviation alerts</span><span id="dev-total" style="font-size:11px;color:var(--muted)"></span></div>
+    <div style="max-height:520px;overflow-y:auto" id="dev-list">
+      <div class="empty">Click "Load all deviations" to see baseline alerts</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Deviation type breakdown</span></div>
+    <div class="cb"><div style="height:220px"><canvas id="ch-devbar"></canvas></div></div>
+  </div>
+</div>
+<div id="page-bslexplorer" class="page">
+  <div class="term-panel">
+    <div class="term-title">How to read a baseline profile</div>
+    <div class="term-grid">
+      <div class="term"><b>Usual hours</b> show when this IP normally appears. Off-hours activity can mean attacker activity or abused automation.</div>
+      <div class="term"><b>Usual ports</b> show expected services. A new SSH/RDP/database port is more suspicious than a repeated normal web port.</div>
+      <div class="term"><b>Deviation alerts</b> are the concrete reasons this IP broke its own behavioural baseline.</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="cb" style="display:flex;gap:10px">
+      <input id="bsl-ip" placeholder="Enter IP to explore its baseline…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+      <button class="btn pri" onclick="exploreBaseline()">Explore</button>
+      <button class="btn" onclick="forceRebuild()">Force rebuild</button>
+    </div>
+  </div>
+  <div id="bsl-explorer-panel" style="display:none">
+    <div class="bsl-stat">
+      <div class="bsl-box"><div class="bsl-box-val mv-a" id="bx-events">—</div><div class="bsl-box-lbl">Events in baseline</div></div>
+      <div class="bsl-box"><div class="bsl-box-val mv-w" id="bx-daily">—</div><div class="bsl-box-lbl">Avg events/day</div></div>
+      <div class="bsl-box"><div class="bsl-box-val mv-d" id="bx-alerts">—</div><div class="bsl-box-lbl">Deviation alerts</div></div>
+    </div>
+    <div class="cg2">
+      <div class="card">
+        <div class="ch"><span class="ct">Usual hours (UTC)</span></div>
+        <div class="cb"><div style="height:180px"><canvas id="ch-hours"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><span class="ct">Usual ports</span></div>
+        <div class="cb"><div style="height:180px"><canvas id="ch-ports"></canvas></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">Baseline profile</span></div>
+      <div class="cb" id="bx-profile" style="font-size:12px;color:var(--muted);line-height:2"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">Deviation alerts for this IP</span></div>
+      <div style="max-height:320px;overflow-y:auto" id="bx-alerts-list"></div>
+    </div>
+  </div>
+</div>
+<div id="page-ml" class="page">
+  <div class="term-panel">
+    <div class="term-title">How to read ML anomaly scoring</div>
+    <div class="term-grid">
+      <div class="term"><b>Anomaly score</b> is the raw Isolation Forest output. Lower/negative means the IP looks more unusual compared with other IPs.</div>
+      <div class="term"><b>Risk score</b> is the SOC-facing 0-100 danger score. It combines ML abnormality plus baseline and threat signals.</div>
+      <div class="term"><b>Confidence</b> says how much evidence supports that risk. Few logs means lower confidence, even if the IP looks suspicious.</div>
+      <div class="term"><b>Isolation Forest</b> finds IPs that are isolated from normal behaviour patterns. It does not know "bad"; it finds outliers.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn pri" onclick="trainModel()">Train ML model</button>
+    <button class="btn" onclick="loadAnomalies()">Load anomalies</button>
+    <span id="train-status" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <input id="ml-ip" placeholder="Score a specific IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+    <button class="btn" onclick="scoreIP()">Score IP</button>
+  </div>
+  <div id="score-panel" style="display:none" class="card">
+    <div class="ch"><span class="ct">IP Risk Score</span></div>
+    <div class="cb" id="score-body"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Detected anomalies — Isolation Forest + Baseline boost</span></div>
+    <table class="tbl">
+      <thead><tr><th>IP</th><th>Risk score</th><th>Anomaly score</th><th>Level</th><th></th></tr></thead>
+      <tbody id="anom-tbody"></tbody>
+    </table>
+  </div>
+</div>
+<div id="page-clusters" class="page">
+  <div style="margin-bottom:16px">
+    <button class="btn pri" onclick="loadClusters()">Analyse clusters</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:12px">Finds coordinated groups by /24 subnet</span>
+  </div>
+  <div id="clusters-body"></div>
+</div>
+<div id="page-blocklist" class="page">
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <input id="block-ip" placeholder="Manually block an IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
+    <button class="btn red" onclick="manualBlock()">Block</button>
+    <button class="btn" onclick="loadBlocklist()">↻ Refresh</button>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Active blocklist</span><span id="bl-count" style="font-size:11px;color:var(--muted)"></span></div>
+    <div class="cb" id="bl-body"></div>
+  </div>
+</div>
+<div id="page-ingest" class="page">
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><span class="ct">Upload CSV log file</span></div>
+    <div class="cb">
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()" ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave()">
+        <h3 style="margin-bottom:8px">Drop CSV file here</h3>
+        <p style="color:var(--muted);font-size:12px">or click to browse</p>
+        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="uploadCSV(this.files[0])"/>
+      </div>
+      <div class="prog-wrap" id="prog-wrap"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>
+      <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Paste single JSON log</span></div>
+    <div class="cb">
+      <textarea id="json-log" rows="4" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;resize:vertical" placeholder='{"@timestamp":"2026-04-22T09:30:00Z","rule.description":"Fortigate: Login failed.","data.ui":"85.11.187.36","data.level":"alert"}'></textarea>
+      <button class="btn pri" style="margin-top:10px" onclick="ingestJSON()">Ingest</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Quick actions</span></div>
+    <div class="cb" style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn yel" onclick="buildAllBaselines()">Build all baselines</button>
+      <button class="btn pri" onclick="trainModelQuick()">Train ML model</button>
+      <span id="qa-status" style="font-size:12px;color:var(--muted);align-self:center"></span>
+    </div>
+  </div>
+</div>
+</main>
+</div>
 <div class="toast-wrap" id="toast-wrap"></div>
-
 <script>
-const API  = '/api';
-const MLAPI = '/api/ml';
+const API='/api', ML='/api/ml';
+let charts={}, curIP='';
 
-let charts = {};
-let currentIP = '';
-let statsData = {};
-
-// ─── Navigation ─────────────────────────────────────────────────────────────
-
-function showPage(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n => {
-    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(name)) {
-      n.classList.add('active');
-    }
+function nav(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.ni').forEach(n=>{
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');
   });
-  const titles = { overview:'Overview', trail:'IP Trail', alerts:'Live Alerts', ml:'ML Anomaly Detection', clusters:'Subnet Cluster Analysis', blocklist:'Blocklist', ingest:'Ingest Logs' };
-  document.getElementById('page-title').textContent = titles[name] || name;
-
-  if (name === 'overview')   refreshAll();
-  if (name === 'blocklist')  loadBlocklist();
-  if (name === 'alerts')     loadAlerts();
-  if (name === 'clusters')   loadClusters();
-  if (name === 'ml')         loadAnomalies();
+  const T={overview:'Overview',trail:'IP Trail',livealerts:'Live Alerts',
+    deviations:'Baseline Deviations',bslexplorer:'Baseline Explorer',
+    ml:'ML Anomaly',clusters:'Subnet Clusters',blocklist:'Blocklist',ingest:'Ingest Logs'};
+  document.getElementById('page-title').textContent=T[name]||name;
+  if(name==='overview') refreshAll();
+  if(name==='livealerts') loadLiveAlerts();
+  if(name==='blocklist') loadBlocklist();
+  if(name==='clusters') loadClusters();
+  if(name==='ml') loadAnomalies();
+  if(name==='deviations') loadDeviations();
 }
-
-// ─── Toast ──────────────────────────────────────────────────────────────────
-
-function toast(msg, type='ok') {
-  const wrap = document.getElementById('toast-wrap');
-  const el   = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  wrap.appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+function toast(msg,type='ok'){
+  const w=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className='toast '+type; el.textContent=msg;
+  w.appendChild(el); setTimeout(()=>el.remove(),3500);
 }
-
-// ─── API helpers ─────────────────────────────────────────────────────────────
-
-async function apiFetch(url, opts={}) {
-  try {
-    const r = await fetch(url, opts);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return await r.json();
-  } catch(e) {
-    toast('API error: ' + e.message, 'err');
-    return null;
-  }
+async function get(url){
+  try{const r=await fetch(url); if(!r.ok)throw new Error('HTTP '+r.status); return await r.json();}
+  catch(e){toast('API: '+e.message,'err'); return null;}
 }
-
-// ─── Overview ────────────────────────────────────────────────────────────────
-
-async function refreshAll() {
-  const stats = await apiFetch(`${API}/stats`);
-  if (!stats) return;
-  statsData = stats;
-
-  document.getElementById('m-total').textContent   = stats.total_logs.toLocaleString();
-  document.getElementById('m-ips').textContent      = stats.unique_ips.toLocaleString();
-  document.getElementById('m-hot').textContent      = stats.hot_ips.length;
-  document.getElementById('m-blocked').textContent  = stats.blocklist.length;
-  document.getElementById('m-bf').textContent       = (stats.threat_counts.brute_force || 0).toLocaleString();
-  document.getElementById('m-km').textContent       = (stats.threat_counts.known_malicious || 0).toLocaleString();
-
-  document.getElementById('last-refresh').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
-  drawThreatChart(stats.threat_counts);
-
-  const hot = await apiFetch(`${API}/hot-ips`);
-  if (hot) {
-    drawHotIPChart(hot.slice(0, 8));
-    buildHotTable(hot);
-    document.getElementById('hot-count').textContent = hot.length + ' IPs';
-  }
-
-  // ML health check
-  const mlh = await apiFetch(`${MLAPI}/health`);
-  if (mlh) {
-    const el = document.getElementById('mlstatus');
-    el.innerHTML = mlh.model_ready
-      ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
-      : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> ML not trained';
-  }
+async function post(url,body=null){
+  try{
+    const opts={method:'POST'};
+    if(body){opts.headers={'Content-Type':'application/json'}; opts.body=JSON.stringify(body);}
+    const r=await fetch(url,opts); if(!r.ok)throw new Error('HTTP '+r.status); return await r.json();
+  }catch(e){toast('API: '+e.message,'err'); return null;}
 }
-
-function drawThreatChart(counts) {
-  const labels = Object.keys(counts);
-  const data   = Object.values(counts);
-  const colors = ['#f85149','#e3b341','#58a6ff','#3fb950','#bc8cff','#f0883e','#39d353'];
-
-  if (charts.threat) charts.threat.destroy();
-  const ctx = document.getElementById('chart-threat').getContext('2d');
-  charts.threat = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'right', labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 10, padding: 10 } } }
-    }
+async function postForm(url,fd){
+  try{const r=await fetch(url,{method:'POST',body:fd}); if(!r.ok)throw new Error('HTTP '+r.status); return await r.json();}
+  catch(e){toast('API: '+e.message,'err'); return null;}
+}
+async function del(url){
+  try{const r=await fetch(url,{method:'DELETE'}); return await r.json();}
+  catch(e){toast('API: '+e.message,'err'); return null;}
+}
+const COLORS=['#f85149','#e3b341','#58a6ff','#3fb950','#bc8cff','#f0883e','#39d353','#ffa657','#79c0ff','#d2a8ff'];
+function pie(id,counts){
+  const labels=Object.keys(counts), data=Object.values(counts);
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id).getContext('2d'),{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:COLORS.slice(0,labels.length),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8b949e',font:{size:10},boxWidth:10,padding:8}}}}
   });
 }
-
-function drawHotIPChart(hot) {
-  const labels = hot.map(h => h.ip);
-  const data   = hot.map(h => h.total);
-
-  if (charts.hotips) charts.hotips.destroy();
-  const ctx = document.getElementById('chart-hotips').getContext('2d');
-  charts.hotips = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{ label: 'Events', data, backgroundColor: '#f85149', borderRadius: 4 }]
-    },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', font: { size: 10, family: 'Courier New' } }, grid: { display: false } }
-      }
-    }
+function bar(id,labels,data,color='#58a6ff',horizontal=false){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id).getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:color,borderRadius:3}]},
+    options:{indexAxis:horizontal?'y':'x',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e',font:{size:10,family:'Courier New'}},grid:{color:'#21262d'}}}}
   });
 }
-
-function buildHotTable(hot) {
-  const tbody = document.getElementById('hot-ip-table');
-  tbody.innerHTML = hot.slice(0, 30).map(h => {
-    const topThreat = h.threat_types ? Object.entries(h.threat_types).sort((a,b)=>b[1]-a[1])[0] : ['?', 0];
-    const sev = Object.entries(h.severities || {}).sort((a,b)=>b[1]-a[1])[0];
-    const sevClass = sev ? sev[0] : 'low';
-    return `<tr onclick="loadIPDetail('${h.ip}')" style="cursor:pointer">
-      <td style="color:var(--accent);font-weight:600">${h.ip}</td>
-      <td>${h.total}</td>
-      <td style="font-size:11px;color:var(--muted)">${h.first_seen ? h.first_seen.substring(0,19).replace('T',' ') : '—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${h.last_seen  ? h.last_seen.substring(0,19).replace('T',' ')  : '—'}</td>
-      <td>${topThreat[0].replace(/_/g,' ')}</td>
-      <td><span class="badge ${sevClass}">${sevClass}</span></td>
-      <td><button class="btn" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();loadIPDetail('${h.ip}')">Trail</button></td>
-    </tr>`;
-  }).join('');
-}
-
-// ─── IP Trail ────────────────────────────────────────────────────────────────
-
-async function searchIP() {
-  const q = document.getElementById('ip-search').value.trim();
-  if (!q) return;
-  showPage('trail');
-  document.getElementById('trail-ip-input').value = q;
-  await loadTrail();
-}
-
-async function loadIPDetail(ip) {
-  showPage('trail');
-  document.getElementById('trail-ip-input').value = ip;
-  await loadTrail();
-}
-
-async function loadTrail() {
-  const ip = document.getElementById('trail-ip-input').value.trim();
-  if (!ip) return;
-  currentIP = ip;
-
-  const [summary, trail] = await Promise.all([
-    apiFetch(`${API}/trail/${ip}/summary`),
-    apiFetch(`${API}/trail/${ip}?limit=200`)
-  ]);
-
-  if (!summary || !summary.found) { toast('No events found for ' + ip, 'warn'); return; }
-
-  document.getElementById('trail-summary-panel').style.display = 'block';
-  document.getElementById('ts-ip').textContent    = ip;
-  document.getElementById('ts-total').textContent = summary.total;
-  document.getElementById('ts-first').textContent = summary.first_seen ? summary.first_seen.substring(0,19).replace('T',' ') : '—';
-  document.getElementById('ts-last').textContent  = summary.last_seen  ? summary.last_seen.substring(0,19).replace('T',' ')  : '—';
-
-  const topThreat = summary.threat_types ? Object.entries(summary.threat_types).sort((a,b)=>b[1]-a[1])[0] : ['unknown',0];
-  document.getElementById('ts-threat').textContent = topThreat[0].replace(/_/g,' ');
-
-  const sev = summary.severities ? Object.entries(summary.severities).sort((a,b)=>b[1]-a[1])[0] : ['low',0];
-  const badge = document.getElementById('ts-badge');
-  badge.className = 'badge ' + (sev ? sev[0] : 'low');
-  badge.textContent = sev ? sev[0] : 'low';
-
-  document.getElementById('ts-block-badge').style.display = summary.is_blocked ? 'inline-block' : 'none';
-
-  const threatBadges = document.getElementById('ts-threat-badges');
-  threatBadges.innerHTML = Object.entries(summary.threat_types || {}).map(([k,v]) =>
-    `<span class="badge medium" style="margin-bottom:4px">${k.replace(/_/g,' ')}: ${v}</span>`
-  ).join('');
-
-  // Build trail events
-  if (trail && trail.events) {
-    const eventsHtml = trail.events.map(e => {
-      const sevCls = e.severity || 'low';
-      const ts = e.ts ? e.ts.substring(0,19).replace('T',' ') : '—';
-      return `<div class="trail-item">
-        <span class="trail-dot ${sevCls}"></span>
-        <span class="trail-ts">${ts}</span>
-        <span class="trail-desc">
-          <b>${(e.threat_type || 'unknown').replace(/_/g,' ')}</b> &mdash;
-          ${e.rule || ''}
-          ${e.signature ? `<br><span style="color:var(--accent);font-size:11px">${e.signature}</span>` : ''}
-          ${e.dst_ip ? `<br>→ ${e.dst_ip}${e.dst_port ? ':'+e.dst_port : ''}` : ''}
-          ${e.mitre ? `<span style="background:rgba(188,140,255,.15);color:#bc8cff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px">${e.mitre}</span>` : ''}
-        </span>
-        <div class="trail-badge-wrap"><span class="badge ${sevCls}">${sevCls}</span></div>
-      </div>`;
+async function refreshAll(){
+  const s=await get(`${API}/stats`); if(!s)return;
+  document.getElementById('m-total').textContent=s.total_logs.toLocaleString();
+  document.getElementById('m-ips').textContent=s.unique_ips.toLocaleString();
+  document.getElementById('m-hot').textContent=(s.hot_ips||[]).length;
+  document.getElementById('m-balerts').textContent=s.total_alerts||0;
+  document.getElementById('m-crit').textContent=(s.critical_ips||[]).length;
+  document.getElementById('m-blocked').textContent=(s.blocklist||[]).length;
+  document.getElementById('last-ref').textContent='Refreshed '+new Date().toLocaleTimeString();
+  if(s.threat_counts&&Object.keys(s.threat_counts).length) pie('ch-threats',s.threat_counts);
+  if(s.alert_type_counts&&Object.keys(s.alert_type_counts).length) pie('ch-devtypes',s.alert_type_counts);
+  const hot=await get(`${API}/hot-ips`);
+  if(hot){
+    document.getElementById('hot-count').textContent=hot.length+' IPs';
+    document.getElementById('hot-tbody').innerHTML=hot.slice(0,30).map(h=>{
+      const tt=h.threat_types?Object.entries(h.threat_types).sort((a,b)=>b[1]-a[1])[0]:['?',0];
+      const sv=h.severities?Object.entries(h.severities).sort((a,b)=>b[1]-a[1])[0]:['low',0];
+      return `<tr onclick="goTrail('${h.ip}')" style="cursor:pointer">
+        <td style="color:var(--accent);font-weight:600">${h.ip}</td>
+        <td>${h.total}</td>
+        <td style="font-size:11px;color:var(--muted)">${(h.first_seen||'').substring(0,19).replace('T',' ')}</td>
+        <td style="font-size:11px;color:var(--muted)">${(h.last_seen||'').substring(0,19).replace('T',' ')}</td>
+        <td>${(tt[0]||'').replace(/_/g,' ')}</td>
+        <td><span class="badge ${sv?sv[0]:'low'}">${sv?sv[0]:'low'}</span></td>
+        <td><button class="btn" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();goTrail('${h.ip}')">Trail</button></td>
+      </tr>`;
     }).join('');
-    document.getElementById('trail-events').innerHTML = eventsHtml;
+  }
+  const mlh=await get(`${ML}/health`);
+  if(mlh){
+    document.getElementById('ml-status').innerHTML=mlh.model_ready
+      ?'<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
+      :'<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> Not trained';
   }
 }
-
-async function loadTrailIntel() {
-  if (!currentIP) return;
-  const intel = await apiFetch(`${API}/intel/${currentIP}`);
-  if (!intel) return;
-
-  const panel = document.getElementById('intel-panel');
-  const body  = document.getElementById('intel-body');
-  panel.style.display = 'block';
-
-  let html = `<b>IP:</b> ${intel.ip} &nbsp;|&nbsp; <b>Known bad subnet:</b> ${intel.is_known_bad ? '<span style="color:var(--danger)">YES</span>' : 'No'} &nbsp;|&nbsp; <b>In blocklist:</b> ${intel.in_blocklist ? '<span style="color:var(--danger)">YES</span>' : 'No'}<br>`;
-  if (intel.abuseipdb) {
-    const a = intel.abuseipdb;
-    html += `<b>AbuseIPDB score:</b> <span style="color:${a.score>50?'var(--danger)':a.score>25?'var(--warn)':'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp;
-             <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp;
-             <b>Reports:</b> ${a.reports} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor ? 'Yes':'No'}`;
-  } else {
-    html += `<span style="color:var(--muted)">AbuseIPDB: not configured (add ABUSEIPDB_KEY to .env)</span>`;
+function doSearch(){const q=document.getElementById('ip-search').value.trim(); if(!q)return; goTrail(q);}
+function goTrail(ip){nav('trail'); document.getElementById('trail-input').value=ip; loadTrail();}
+async function loadTrail(){
+  const ip=document.getElementById('trail-input').value.trim(); if(!ip)return;
+  curIP=ip;
+  const [sum,trail]=await Promise.all([get(`${API}/trail/${ip}/summary`),get(`${API}/trail/${ip}?limit=200`)]);
+  if(!sum||!sum.found){toast('No events for '+ip,'warn'); return;}
+  document.getElementById('trail-panel').style.display='block';
+  document.getElementById('t-ip').textContent=ip;
+  document.getElementById('t-total').textContent=sum.total;
+  document.getElementById('t-first').textContent=(sum.first_seen||'').substring(0,19).replace('T',' ');
+  document.getElementById('t-last').textContent=(sum.last_seen||'').substring(0,19).replace('T',' ');
+  const tt=sum.threat_types?Object.entries(sum.threat_types).sort((a,b)=>b[1]-a[1])[0]:['unknown',0];
+  document.getElementById('t-threat').textContent=(tt[0]||'').replace(/_/g,' ');
+  const sv=sum.severities?Object.entries(sum.severities).sort((a,b)=>b[1]-a[1])[0]:['low',0];
+  const b=document.getElementById('t-sev-badge');
+  b.className='badge '+(sv?sv[0]:'low'); b.textContent=sv?sv[0]:'low';
+  document.getElementById('t-blocked-badge').style.display=sum.is_blocked?'inline-block':'none';
+  document.getElementById('t-badges').innerHTML=Object.entries(sum.threat_types||{}).map(([k,v])=>`<span class="badge medium" style="margin-bottom:4px">${k.replace(/_/g,' ')}: ${v}</span>`).join('');
+  if(trail&&trail.events){
+    document.getElementById('trail-events').innerHTML=trail.events.length?trail.events.map(e=>{
+      const sc=e.severity||'low';
+      return `<div class="ti">
+        <span class="tdot ${sc}"></span>
+        <span class="tts">${(e.ts||'').substring(0,19).replace('T',' ')}</span>
+        <span class="tdesc">
+          <b>${(e.threat_type||'unknown').replace(/_/g,' ')}</b> — ${e.rule||''}
+          ${e.signature?`<br><span style="color:var(--accent);font-size:11px">${e.signature}</span>`:''}
+          ${e.dst_ip?`<br>→ ${e.dst_ip}${e.dst_port?':'+e.dst_port:''}`:''}
+          ${e.mitre?`<span style="background:rgba(188,140,255,.15);color:#bc8cff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px">${e.mitre}</span>`:''}
+        </span>
+        <span class="badge ${sc}">${sc}</span>
+      </div>`;
+    }).join(''):'<div class="empty">No events</div>';
   }
-  body.innerHTML = html;
 }
-
-async function blockCurrentIP() {
-  if (!currentIP) return;
-  await apiFetch(`${API}/blocklist/add`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ip: currentIP}) });
-  toast(currentIP + ' added to blocklist', 'ok');
+async function loadIntel(){
+  if(!curIP)return;
+  const d=await get(`${API}/intel/${curIP}`); if(!d)return;
+  document.getElementById('intel-panel').style.display='block';
+  let h=`<b>IP:</b> ${d.ip} &nbsp;|&nbsp; <b>Known bad:</b> ${d.is_known_bad?'<span style="color:var(--danger)">YES</span>':'No'} &nbsp;|&nbsp; <b>Blocked:</b> ${d.in_blocklist?'<span style="color:var(--danger)">YES</span>':'No'}<br>`;
+  if(d.abuseipdb){const a=d.abuseipdb; h+=`<b>AbuseIPDB:</b> <span style="color:${a.score>50?'var(--danger)':a.score>25?'var(--warn)':'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp; <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor?'Yes':'No'}`;}
+  else h+=`<span style="color:var(--muted)">AbuseIPDB not configured</span>`;
+  document.getElementById('intel-body').innerHTML=h;
 }
-
-// ─── Live Alerts ─────────────────────────────────────────────────────────────
-
-async function loadAlerts() {
-  const hot = await apiFetch(`${API}/hot-ips`);
-  if (!hot) return;
-
-  const allEvents = [];
-  for (const h of hot.slice(0, 15)) {
-    const trail = await apiFetch(`${API}/trail/${h.ip}?limit=20`);
-    if (trail && trail.events) {
-      trail.events.forEach(e => allEvents.push({ ...e, _ip: h.ip }));
+async function loadBaseline(){
+  if(!curIP)return;
+  const [bsl,alr]=await Promise.all([get(`${API}/baseline/${curIP}`),get(`${API}/alerts/${curIP}`)]);
+  document.getElementById('bsl-panel').style.display='block';
+  const ac=alr&&alr.alerts?alr.alerts.length:0;
+  document.getElementById('bsl-alert-count').textContent=ac?`⚠ ${ac} deviation alert(s)`:'';
+  let h='';
+  if(bsl&&bsl.found){
+    const b=bsl.baseline;
+    h+=`<b>Built:</b> ${(b.built_at||'').substring(0,19).replace('T',' ')} &nbsp;|&nbsp; <b>Events:</b> ${b.event_count}<br>`;
+    h+=`<b>Avg daily:</b> ${b.avg_daily_events}/day &nbsp;|&nbsp; <b>Avg severity:</b> ${b.avg_severity_score} (1=low 4=critical)<br>`;
+    h+=`<b>Login failures:</b> ${b.total_failures} &nbsp;|&nbsp; <b>Successes:</b> ${b.total_successes}<br>`;
+    h+=`<b>Usual ports:</b> ${Object.keys(b.usual_ports||{}).slice(0,8).join(', ')||'none'}<br>`;
+    h+=`<b>Countries:</b> ${Object.keys(b.usual_countries||{}).join(', ')||'none'}<br>`;
+    h+=`<b>Active hours (UTC):</b> ${Object.keys(b.usual_hours||{}).sort((a,c)=>+a-+c).map(x=>x.padStart(2,'0')+':00').join(', ')||'none'}<br>`;
+    h+=`<b>Weekdays:</b> ${Object.keys(b.usual_weekdays||{}).map(d=>['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][+d]).join(', ')||'none'}<br>`;
+    h+=`<b>Threat types seen:</b> ${Object.keys(b.usual_rule_groups||{}).map(k=>k.replace(/_/g,' ')).join(', ')||'none'}<br>`;
+    if(alr&&alr.alerts&&alr.alerts.length){
+      h+=`<br><b style="color:var(--danger)">⚠ ${alr.alerts.length} Deviation alert(s) — see Baseline Explorer for full explainers</b><br>`;
+      alr.alerts.forEach(a=>{
+        const exp=alertWhy(a.type,a.severity);
+        h+=`<div style="margin:4px 0;padding:7px 10px;background:var(--bg3);border-radius:5px;border-left:3px solid ${a.severity==='critical'?'var(--danger)':'var(--warn)'}">`;
+        h+=`<span style="color:${a.severity==='critical'?'var(--danger)':'var(--warn)'};font-weight:700;font-size:11px">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span> `;
+        h+=`<span style="font-size:12px;color:var(--text)"> — ${a.message}</span><br>`;
+        h+=`<span style="font-size:11px;color:var(--muted)">${exp.action}</span></div>`;
+      });
     }
+  } else h='<span style="color:var(--warn)">No baseline yet. Needs 10+ events. Use "Force rebuild" or wait for auto-build.</span>';
+  document.getElementById('bsl-body').innerHTML=h;
+}
+async function blockCurrent(){if(!curIP)return; await post(`${API}/blocklist/add`,{ip:curIP}); toast(curIP+' blocked','ok');}
+async function loadLiveAlerts(){
+  const hot=await get(`${API}/hot-ips`); if(!hot)return;
+  const all=[];
+  for(const h of hot.slice(0,15)){
+    const t=await get(`${API}/trail/${h.ip}?limit=20`);
+    if(t&&t.events) t.events.forEach(e=>all.push({...e,_ip:h.ip}));
   }
-  allEvents.sort((a,b) => (b.ts||'').localeCompare(a.ts||''));
-
-  const tbody = document.getElementById('alerts-table');
-  tbody.innerHTML = allEvents.slice(0, 100).map(e => `<tr>
+  all.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  document.getElementById('live-tbody').innerHTML=all.slice(0,100).map(e=>`<tr>
     <td style="font-size:11px">${(e.ts||'').substring(0,19).replace('T',' ')}</td>
-    <td style="color:var(--accent);cursor:pointer" onclick="loadIPDetail('${e._ip}')">${e._ip}</td>
+    <td style="color:var(--accent);cursor:pointer" onclick="goTrail('${e._ip}')">${e._ip}</td>
     <td>${(e.threat_type||'').replace(/_/g,' ')}</td>
-    <td style="font-size:11px;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.rule||''}">${(e.rule||'').substring(0,60)}</td>
+    <td style="font-size:11px;color:var(--muted);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(e.rule||'').substring(0,55)}</td>
     <td><span class="badge ${e.severity||'low'}">${e.severity||'low'}</span></td>
     <td style="font-size:11px">${e.dst_ip||'—'}</td>
   </tr>`).join('');
 }
-
-// ─── ML ──────────────────────────────────────────────────────────────────────
-
-async function trainModel() {
-  document.getElementById('train-status').textContent = 'Training…';
-  const r = await apiFetch(`${MLAPI}/train`, { method:'POST' });
-  if (r) {
-    document.getElementById('train-status').textContent = `Trained on ${r.ip_count} IPs · ${r.anomalies} anomalies found`;
-    toast('Model trained successfully!', 'ok');
-    await loadAnomalies();
-  }
+const WHY = {
+  port_shift: {
+    why: "This IP has a history of connecting to specific ports. It just connected to a port it has <b>never used before</b>. Attackers change ports when pivoting laterally — moving from one system to another after initial access.",
+    action: { critical:"Isolate the source host immediately. Check if this port is a database or admin service.",
+               high:"Investigate the new port. Verify if any service should be accepting connections from this IP.",
+               medium:"Monitor closely. Correlate with other events from this IP.",
+               low:"Log and watch." }
+  },
+  sensitive_port_targeted: {
+    why: "A <b>database or admin port</b> (MySQL, PostgreSQL, RDP, SSH, SMB etc.) was hit for the first time by this IP. These ports are high-value targets — attackers scan them specifically to find unprotected services.",
+    action: { critical:"Block this IP immediately. Check if the service is exposed to the internet. Audit access logs on that service.",
+               high:"Verify if this access was authorised. Check firewall rules for this port.",
+               medium:"Review whether this port should be reachable from this IP.",
+               low:"Log and review." }
+  },
+  new_subnet_reached: {
+    why: "This IP has started reaching a <b>network segment it never contacted before</b>. Lateral movement almost always involves an attacker expanding from one subnet to another — from DMZ to internal, or from one VLAN to another.",
+    action: { critical:"Check if the new subnet is internal. If yes — treat as active lateral movement. Isolate immediately.",
+               high:"Investigate what hosts are in the new subnet. Check for any successful connections.",
+               medium:"Review network segmentation rules. Should this IP reach that subnet?",
+               low:"Log and monitor." }
+  },
+  internal_host_reached: {
+    why: "An <b>external IP is now reaching an internal RFC1918 address</b> (10.x / 192.168.x / 172.16.x). This should almost never happen. It means either your firewall has a hole, there is a misconfigured NAT rule, or a host inside your network is acting as a relay for the attacker.",
+    action: { critical:"STOP everything. Audit firewall rules for this IP immediately. Check if RDP relay activity is present. This is a confirmed breach indicator.",
+               high:"Block the external IP. Review all firewall allow rules that could permit this path.",
+               medium:"Investigate the network path. Check for proxy or relay hosts.",
+               low:"Review and audit." }
+  },
+  target_shift: {
+    why: "This IP used to hit <b>one or two hosts</b>. Now it is hitting many more unique destination IPs in a short window. This is the textbook signature of <b>lateral movement</b> — the attacker got in somewhere and is now scanning the internal network looking for more targets.",
+    action: { critical:"Treat as active lateral movement. Isolate the source. Check all destination hosts for compromise.",
+               high:"Map all destination IPs. Check if any are critical systems such as domain controllers, database servers, or file servers.",
+               medium:"Review the pattern. Is this a scanner or a person?",
+               low:"Monitor." }
+  },
+  country_shift: {
+    why: "The same IP is now appearing to originate from a <b>different country than usual</b>. This can mean the attacker switched VPN or proxy servers mid-campaign, or this IP was handed off to a different threat actor in a different location.",
+    action: { critical:"Treat as confirmed proxy rotation. Block the IP. Check if the original country events and new country events form a coherent attack chain.",
+               high:"Investigate the country change. Is this a legitimate geolocation update or proxy switching?",
+               medium:"Monitor and correlate with other indicators.",
+               low:"Log." }
+  },
+  off_hours_activity: {
+    why: "This IP is active at an <b>hour it has never been active before</b>. Normal business traffic and automated systems usually follow predictable schedules. Activity at unusual hours can indicate an attacker operating in a different timezone or a compromised automated system.",
+    action: { critical:"Check if any user account is associated with this IP. Verify whether this is legitimate admin work or an attacker.",
+               high:"Review what actions occurred during this off-hours window. Check login events.",
+               medium:"Correlate with VPN logs and user activity logs.",
+               low:"Log and monitor." }
+  },
+  weekend_anomaly: {
+    why: "This IP has <b>only ever been seen on weekdays</b> — but is now active on a weekend. Bank systems should have minimal external traffic on weekends. Attackers often choose weekends because monitoring is reduced and response times are slower.",
+    action: { critical:"Escalate to on-call SOC. Verify if any scheduled maintenance is planned. If not, treat as active attack.",
+               high:"Check what the IP is doing. Compare with weekday patterns.",
+               medium:"Investigate the business justification for weekend activity.",
+               low:"Log." }
+  },
+  volume_spike: {
+    why: "This IP sent <b>significantly more events than its daily baseline</b>. A sudden activity spike can indicate reconnaissance, brute force ramp-up, or an automated tool that just started running.",
+    action: { critical:"Check event types in the spike. If brute force or scanning is present, block immediately. If data transfer is present, check for exfiltration.",
+               high:"Analyse what events are spiking. Is this the same type as before or a new behaviour?",
+               medium:"Monitor the rate. Set an auto-block threshold if rate continues.",
+               low:"Watch the trend." }
+  },
+  new_rule_category: {
+    why: "This IP previously triggered one category of alerts, but now triggered a <b>completely new category</b>. This is an escalation signal because the attacker may have changed tactics or gained new capability.",
+    action: { critical:"Treat as escalation to exploitation phase. The attack has moved beyond reconnaissance. Isolate affected systems.",
+               high:"Investigate what changed. Did the attacker gain credentials? Did a new tool get deployed?",
+               medium:"Review the new rule type in context of the full attack timeline.",
+               low:"Log and watch." }
+  },
+  rule_escalation: {
+    why: "The <b>severity of events from this IP is trending upward</b>. It started with lower-severity events and is now triggering high or critical rules. This follows a typical attack progression from reconnaissance to exploitation.",
+    action: { critical:"The attacker may have reached exploitation phase. Check for successful logins, file access, or lateral movement.",
+               high:"Review the escalation timeline. Identify the exact point where severity jumped.",
+               medium:"Monitor for further escalation. Prepare to block.",
+               low:"Watch the trend." }
+  },
+  first_success_after_failures: {
+    why: "This IP had <b>many failed login attempts followed by a SUCCESS</b>. This is the most critical signal in brute force detection because it can mean the attacker found a valid credential.",
+    action: { critical:"IMMEDIATE ACTION: Disable the compromised account now. Check what happened after login. Review all sessions from this IP.",
+               high:"Verify if this success was legitimate. Check with the account owner.",
+               medium:"Review the login context. Was MFA bypassed?",
+               low:"Investigate." }
+  },
+  automated_tool_detected: {
+    why: "Events from this IP are arriving with <b>near-perfect timing intervals</b> — too regular to be a human. This is the signature of an automated scanner, brute force tool, or exploit framework.",
+    action: { critical:"Block the IP immediately. Automated tools can test many credentials quickly.",
+               high:"Rate-limit or block. Identify the tool by signature, user agent, or payload pattern.",
+               medium:"Monitor the tool's targets. Is it scanning one service or multiple?",
+               low:"Log the tool signature." }
+  },
+  dormant_ip_reactivated: {
+    why: "This IP was <b>inactive for a week or more and just came back</b>. Dormant IPs that suddenly reactivate can be botnet nodes, compromised devices coming back online, or an attacker returning to a previous target.",
+    action: { critical:"Treat as returning attacker. Review what this IP did before going dormant. Correlate with incidents during that period.",
+               high:"Check if the reactivation lines up with any other events in your environment.",
+               medium:"Monitor closely. Compare new activity with previous activity.",
+               low:"Log the gap and new activity." }
+  },
+};
+function alertWhy(type, severity) {
+  const e = WHY[type];
+  if (!e) return { why: 'Behavioural deviation detected — this IP is acting outside its established pattern.', action: 'Investigate this IP.' };
+  return { why: e.why, action: e.action?.[severity] || 'Investigate.' };
 }
-
-async function scoreIP() {
-  const ip = document.getElementById('ml-ip-input').value.trim();
-  if (!ip) return;
-  const r = await apiFetch(`${MLAPI}/score/${ip}`);
-  if (!r) return;
-
-  const panel = document.getElementById('ml-score-panel');
-  const body  = document.getElementById('ml-score-body');
-  panel.style.display = 'block';
-
-  const riskColor = r.risk_score > 70 ? 'var(--danger)' : r.risk_score > 40 ? 'var(--warn)' : 'var(--ok)';
-  body.innerHTML = `
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
-      <div><div style="font-size:11px;color:var(--muted)">Risk score</div><div style="font-size:32px;font-weight:700;color:${riskColor}">${r.risk_score??'—'}/100</div></div>
-      <div><div style="font-size:11px;color:var(--muted)">Anomaly score</div><div style="font-size:32px;font-weight:700">${r.anomaly_score??'—'}</div></div>
-      <div><div style="font-size:11px;color:var(--muted)">Is anomaly</div><div style="font-size:20px;font-weight:700;color:${r.is_anomaly?'var(--danger)':'var(--ok)'}">${r.is_anomaly?'YES':'No'}</div></div>
+function renderAlert(a, showIP=true) {
+  const sc = a.severity || 'low';
+  const sevColor = {critical:'var(--danger)',high:'var(--warn)',medium:'var(--accent)',low:'var(--ok)'};
+  const exp = alertWhy(a.type, sc);
+  const details = a.details ? Object.entries(a.details).slice(0,4).map(([k,v]) =>
+    `<span class="alert-detail-chip">${k.replace(/_/g,' ')}: ${Array.isArray(v)?v.slice(0,3).join(', '):v}</span>`
+  ).join('') : '';
+  const actionIcon = {critical:'IMMEDIATE ACTION',high:'ACTION REQUIRED',medium:'INVESTIGATE',low:'MONITOR'}[sc] || 'Investigate';
+  return `<div class="alert-card ${sc}">
+    <div class="alert-top">
+      ${showIP?`<span class="alert-ip-label" onclick="goTrail('${a.ip}')">${a.ip}</span>`:''}
+      <span class="alert-type-label" style="color:${sevColor[sc]}">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span>
+      <span class="badge ${sc}">${sc}</span>
+      <span class="alert-time">${(a.ts||'').substring(11,19)}</span>
     </div>
-    ${r.features ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:2">
-      Events: ${r.features.n_events} &nbsp;|&nbsp;
-      Rate: ${r.features.event_rate_pm}/min &nbsp;|&nbsp;
-      Unique dst IPs: ${r.features.unique_dst_ips} &nbsp;|&nbsp;
-      Brute force: ${r.features.brute_force_cnt} &nbsp;|&nbsp;
-      DB scans: ${r.features.db_scan_cnt}
-    </div>` : ''}`;
+    <div class="alert-message"><b>What happened:</b> ${a.message||''}</div>
+    <div class="alert-why"><b>Why this is ${sc}:</b> ${exp.why}</div>
+    <div class="alert-action ${sc}">${actionIcon}: ${exp.action}</div>
+    ${details?`<div class="alert-details">${details}</div>`:''}
+  </div>`;
+}
+async function loadDeviations(sev=null){
+  document.getElementById('dev-status').textContent='Loading…';
+  const url=sev?`${API}/alerts?severity=${sev}&limit=500`:`${API}/alerts?limit=500`;
+  const r=await get(url); if(!r)return;
+  document.getElementById('dev-total').textContent=r.total+' total';
+  document.getElementById('dev-status').textContent=r.alerts.length+' shown';
+  const byIP={};
+  r.alerts.forEach(a=>{byIP[a.ip]=byIP[a.ip]||[]; byIP[a.ip].push(a);});
+  const sorted=Object.entries(byIP).sort((a,b)=>b[1].length-a[1].length);
+  document.getElementById('dev-ip-count').textContent=sorted.length+' IPs';
+  document.getElementById('dev-ip-chips').innerHTML=sorted.length
+    ?sorted.map(([ip,als])=>{
+        const hasCrit=als.some(a=>a.severity==='critical');
+        return `<span class="ip-chip" style="${hasCrit?'':'background:rgba(227,179,65,.12);color:var(--warn)'}" onclick="goTrail('${ip}')" title="${als.length} alerts">${ip} (${als.length})</span>`;
+      }).join('')
+    :'<span style="color:var(--muted);font-size:12px">No deviations yet — build baselines first</span>';
+  const typeCounts={};
+  r.alerts.forEach(a=>{const t=a.type||'unknown'; typeCounts[t]=(typeCounts[t]||0)+1;});
+  if(Object.keys(typeCounts).length){
+    const entries=Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+    bar('ch-devbar',entries.map(e=>e[0].replace(/_/g,' ')),entries.map(e=>e[1]),'#e3b341',true);
+  }
+  document.getElementById('dev-list').innerHTML=r.alerts.length
+    ?r.alerts.map(a=>renderAlert(a,true)).join('')
+    :'<div class="empty">No deviation alerts found. Upload logs → Build baselines → Check here.</div>';
+}
+async function buildAllBaselines(){
+  document.getElementById('dev-status').textContent='Building baselines…';
+  document.getElementById('qa-status').textContent='Building baselines…';
+  const r=await post(`${API}/baseline/build-all`);
+  if(r){
+    toast(`Built ${r.baselines_built} baselines`,'ok');
+    document.getElementById('dev-status').textContent=`Done — ${r.baselines_built} baselines built`;
+    document.getElementById('qa-status').textContent=`Done — ${r.baselines_built} baselines`;
+    await loadDeviations();
+  }
+}
+async function exploreBaseline(){
+  const ip=document.getElementById('bsl-ip').value.trim(); if(!ip)return;
+  curIP=ip;
+  const [bsl,alr]=await Promise.all([get(`${API}/baseline/${ip}`),get(`${API}/alerts/${ip}`)]);
+  document.getElementById('bsl-explorer-panel').style.display='block';
+  const alerts=alr&&alr.alerts?alr.alerts:[];
+  document.getElementById('bx-alerts').textContent=alerts.length;
+  if(bsl&&bsl.found){
+    const b=bsl.baseline;
+    document.getElementById('bx-events').textContent=b.event_count||0;
+    document.getElementById('bx-daily').textContent=b.avg_daily_events||0;
+    const hrs=Array.from({length:24},(_,i)=>({h:i,c:parseInt(b.usual_hours&&b.usual_hours[String(i)]||0)}));
+    bar('ch-hours',hrs.map(x=>x.h+':00'),hrs.map(x=>x.c),'#58a6ff');
+    const pts=Object.entries(b.usual_ports||{}).sort((a,c)=>c[1]-a[1]).slice(0,10);
+    if(pts.length) bar('ch-ports',pts.map(p=>p[0]),pts.map(p=>p[1]),'#e3b341',true);
+    document.getElementById('bx-profile').innerHTML=`
+      <b>IP:</b> ${ip} &nbsp;|&nbsp; <b>Built:</b> ${(b.built_at||'').substring(0,19).replace('T',' ')} &nbsp;|&nbsp; <b>Events:</b> ${b.event_count}<br>
+      <b>Avg daily:</b> ${b.avg_daily_events}/day &nbsp;|&nbsp; <b>Avg severity score:</b> ${b.avg_severity_score} (1=low 4=critical)<br>
+      <b>Login failures:</b> ${b.total_failures} &nbsp;|&nbsp; <b>Login successes:</b> ${b.total_successes}<br>
+      <b>Countries seen:</b> ${Object.keys(b.usual_countries||{}).join(', ')||'none'}<br>
+      <b>Usual ports:</b> ${Object.keys(b.usual_ports||{}).slice(0,10).join(', ')||'none'}<br>
+      <b>Active hours (UTC):</b> ${Object.keys(b.usual_hours||{}).sort((a,c)=>+a-+c).map(h=>h.padStart(2,'0')+':00').join(', ')||'none'}<br>
+      <b>Weekdays active:</b> ${Object.keys(b.usual_weekdays||{}).map(d=>['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][+d]).join(', ')||'none'}<br>
+      <b>Threat types baseline:</b> ${Object.keys(b.usual_rule_groups||{}).map(k=>k.replace(/_/g,' ')).join(', ')||'none'}`;
+  } else {
+    document.getElementById('bx-events').textContent='0';
+    document.getElementById('bx-daily').textContent='0';
+    document.getElementById('bx-profile').innerHTML='<span style="color:var(--warn)">No baseline yet for this IP. Needs 10+ events. Click Force rebuild.</span>';
+  }
+  document.getElementById('bx-alerts-list').innerHTML=alerts.length
+    ?alerts.map(a=>renderAlert(a,false)).join('')
+    :'<div class="empty">No deviation alerts for this IP</div>';
+}
+async function forceRebuild(){
+  const ip=document.getElementById('bsl-ip').value.trim(); if(!ip)return;
+  const r=await post(`${API}/baseline/${ip}/build`);
+  if(r){toast(r.status==='built'?'Baseline rebuilt for '+ip:'Not enough data','ok'); await exploreBaseline();}
+}
+async function trainModel(){
+  document.getElementById('train-status').textContent='Training…';
+  const r=await post(`${ML}/train`);
+  if(r){document.getElementById('train-status').textContent=`Trained on ${r.ip_count} IPs · ${r.anomalies} anomalies`; toast('Model trained!','ok'); await loadAnomalies();}
+}
+async function trainModelQuick(){
+  document.getElementById('qa-status').textContent='Training model…';
+  const r=await post(`${ML}/train`);
+  if(r){document.getElementById('qa-status').textContent=`Model trained — ${r.anomalies} anomalies found`; toast('Model trained!','ok');}
 }
 
-async function loadAnomalies() {
-  const r = await apiFetch(`${MLAPI}/anomalies`);
-  if (!r) return;
-  const tbody = document.getElementById('anomaly-table');
-  if (!r.anomalies.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">No anomalies detected — train the model first</td></tr>';
-    return;
-  }
-  tbody.innerHTML = r.anomalies.map(a => `<tr onclick="loadIPDetail('${a.ip}')" style="cursor:pointer">
-    <td style="color:var(--accent)">${a.ip}</td>
-    <td><span style="color:${a.risk_score>70?'var(--danger)':a.risk_score>40?'var(--warn)':'var(--ok)'};font-weight:700">${a.risk_score??'—'}</span>/100</td>
-    <td style="color:var(--muted)">${a.anomaly_score??'—'}</td>
-    <td><span class="badge ${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}">${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}</span></td>
-  </tr>`).join('');
+function mlRiskLabel(risk) {
+  if (risk > 70) return 'critical';
+  if (risk > 40) return 'high';
+  return 'medium';
 }
+function confidenceLabel(score) {
+  if (score >= 75) return 'High';
+  if (score >= 45) return 'Medium';
+  return 'Low';
+}
+function confidenceColor(score) {
+  if (score >= 75) return 'var(--ok)';
+  if (score >= 45) return 'var(--warn)';
+  return 'var(--danger)';
+}
+function computeConfidence(r) {
+  const f = r.features || {};
+  let score = 15;
+  score += Math.min(30, Math.log10((Number(f.n_events || 0)) + 1) * 12);
+  if (r.anomaly_score !== null && r.anomaly_score !== undefined) score += 15;
+  if (Number(f.baseline_alerts || 0) > 0) score += 12;
+  if (Number(f.critical_alerts || 0) > 0) score += 12;
+  if ((Number(f.brute_force_cnt || 0) + Number(f.ssh_bf_cnt || 0) + Number(f.vpn_bf_cnt || 0)) > 0) score += 10;
+  if ((Number(f.rdp_cnt || 0) + Number(f.db_scan_cnt || 0) + Number(f.priv_esc_cnt || 0) + Number(f.known_bad_cnt || 0)) > 0) score += 10;
+  if (Number(f.unique_dst_ips || 0) > 3 || Number(f.unique_dst_ports || 0) > 3) score += 6;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+function explainMLScore(r) {
+  const f = r.features || {};
+  const risk = Number(r.risk_score || 0);
+  const confidence = computeConfidence(r);
+  const score = typeof r.anomaly_score === 'number' ? r.anomaly_score : null;
+  const baselineBoost = (Number(f.baseline_alerts || 0) * 2) + (Number(f.critical_alerts || 0) * 5);
+  const baseRisk = Math.max(0, Math.min(100, risk - baselineBoost));
+  const rawRisk = score === null ? null : Math.max(0, Math.min(100, Math.trunc((1 - (score + 0.5)) * 100)));
+  const scorePosition = score === null ? 'not available' : score < -0.1 ? 'well below the anomaly boundary' : score < 0 ? 'just below the anomaly boundary' : 'above the anomaly boundary';
+  const mainReasons = [];
+  const drivers = [];
 
-// ─── Clusters ────────────────────────────────────────────────────────────────
-
-async function loadClusters() {
-  const r = await apiFetch(`${MLAPI}/clusters`);
-  if (!r) return;
-  const panel = document.getElementById('clusters-panel');
-  if (!r.clusters.length) {
-    panel.innerHTML = '<div class="card"><div class="card-body" style="color:var(--muted)">No coordinated clusters found — ingest logs first</div></div>';
-    return;
+  if (r.is_anomaly) {
+    mainReasons.push('Isolation Forest returned anomaly=YES because this IP sits outside the normal cluster of trained IP behaviour.');
+    drivers.push({level:'critical', text:`<b>Model decision:</b> anomaly=YES. This means the IP was separated from normal IPs by the Isolation Forest trees.`});
+  } else {
+    mainReasons.push('Isolation Forest did not mark it as a hard anomaly, so the risk mainly comes from rule/baseline context.');
+    drivers.push({level:'medium', text:`<b>Model decision:</b> anomaly=NO. Any risk here mainly comes from baseline or threat feature context.`});
   }
-  const maxEvts = Math.max(...r.clusters.map(c => c.total_events));
-  panel.innerHTML = `
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-header"><span class="card-title">Coordinated attack clusters</span><span style="font-size:11px;color:var(--muted)">${r.clusters.length} clusters across ${r.total_subnets} subnets</span></div>
-      <div class="card-body">
-        ${r.clusters.map(c => `
-          <div class="cluster-card">
-            <div>
-              <div class="cluster-subnet">${c.subnet}</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px">${c.ip_count} IPs</div>
-            </div>
-            <div class="cluster-bar-bg">
-              <div class="cluster-bar" style="width:${Math.round(c.total_events/maxEvts*100)}%;background:${c.threat_level==='critical'?'var(--danger)':c.threat_level==='high'?'var(--warn)':'var(--accent)'}"></div>
-            </div>
-            <div class="cluster-count">${c.total_events.toLocaleString()} events</div>
-            <span class="badge ${c.threat_level}">${c.threat_level}</span>
-          </div>
-          <div style="padding:0 12px 8px;font-size:11px;color:var(--muted);font-family:var(--mono)">${c.ips.join(', ')}</div>
-        `).join('')}
+  if (score !== null) {
+    mainReasons.push(`Raw anomaly score is ${score}, which is ${scorePosition}; lower than 0 means suspicious.`);
+    drivers.push({level:score < -0.1 ? 'critical' : score < 0 ? 'high' : 'medium', text:`<b>Anomaly score:</b> ${score}. Boundary is around 0. Negative means outlier; positive means more normal. This score produced base risk ${rawRisk}.`});
+  }
+  if (f.baseline_alerts > 0 || f.critical_alerts > 0) {
+    mainReasons.push(`Baseline added ${baselineBoost} points because it has ${f.baseline_alerts || 0} deviation alerts and ${f.critical_alerts || 0} critical deviations.`);
+    drivers.push({level:f.critical_alerts > 0 ? 'critical' : 'high', text:`<b>Baseline boost added ${baselineBoost} risk points.</b> ${f.baseline_alerts || 0} behavioural deviations and ${f.critical_alerts || 0} critical deviations were seen for this IP.`});
+  }
+  if (f.n_events > 500 || f.event_rate_pm > 1) {
+    mainReasons.push(`Event volume is abnormal: ${f.n_events || 0} events at ${f.event_rate_pm || 0}/min.`);
+    drivers.push({level:'high', text:`<b>High activity volume.</b> ${f.n_events || 0} events at ${f.event_rate_pm || 0}/min can indicate scanning, brute force, or automated tooling.`});
+  }
+  if (f.unique_dst_ips > 10 || f.unique_dst_ports > 5) {
+    mainReasons.push(`Target spread is wide: ${f.unique_dst_ips || 0} destination IPs and ${f.unique_dst_ports || 0} destination ports.`);
+    drivers.push({level:'high', text:`<b>Wide target spread.</b> It touched ${f.unique_dst_ips || 0} destination IPs and ${f.unique_dst_ports || 0} ports, which can look like reconnaissance or lateral movement.`});
+  }
+  if (f.brute_force_cnt || f.ssh_bf_cnt || f.vpn_bf_cnt) {
+    mainReasons.push(`Credential attack features are present: ${f.brute_force_cnt || 0} brute-force events.`);
+    drivers.push({level:'critical', text:`<b>Credential attack signals:</b> ${f.brute_force_cnt || 0} brute-force, ${f.ssh_bf_cnt || 0} SSH brute-force, ${f.vpn_bf_cnt || 0} VPN brute-force events.`});
+  }
+  if (f.rdp_cnt || f.db_scan_cnt || f.priv_esc_cnt) {
+    mainReasons.push(`High-value technique features are present: RDP ${f.rdp_cnt || 0}, DB scan ${f.db_scan_cnt || 0}, privilege escalation ${f.priv_esc_cnt || 0}.`);
+    drivers.push({level:'high', text:`<b>High-value technique signals.</b> RDP relay ${f.rdp_cnt || 0}, DB scan ${f.db_scan_cnt || 0}, privilege escalation ${f.priv_esc_cnt || 0}.`});
+  }
+  if (f.known_bad_cnt) {
+    mainReasons.push(`${f.known_bad_cnt} known-malicious events are included in the feature vector.`);
+    drivers.push({level:'critical', text:`<b>Known malicious activity.</b> ${f.known_bad_cnt} known-bad events are included in the feature vector.`});
+  }
+  if (f.pct_critical > 0 || f.pct_high > 0.25) {
+    mainReasons.push(`Severity mix is unusual: ${(Number(f.pct_high || 0) * 100).toFixed(0)}% high severity and ${(Number(f.pct_critical || 0) * 100).toFixed(0)}% critical.`);
+    drivers.push({level:'high', text:`<b>Severity mix is elevated:</b> ${(Number(f.pct_high || 0) * 100).toFixed(0)}% high severity, ${(Number(f.pct_critical || 0) * 100).toFixed(0)}% critical severity.`});
+  }
+  if (drivers.length === 1) {
+    mainReasons.push('No single loud feature dominated; the score came from the combined feature vector compared with other IPs.');
+    drivers.push({level:'medium', text:`<b>No single loud driver dominated.</b> The score came from the combined feature vector after scaling and comparison against other IPs.`});
+  }
+  const finalReason = mainReasons.slice(0, 4).join(' ');
+  const confidenceReason = confidence < 45 ? 'Confidence is low because the model has limited supporting evidence, usually too few events or few corroborating signals.' :
+    confidence < 75 ? 'Confidence is medium because there is useful evidence, but not enough volume or corroboration for full trust.' :
+    'Confidence is high because enough events and multiple signals support the score.';
+  const verdict = risk > 70 ? 'Critical because the base anomaly score plus baseline/security features crossed the critical threshold.' :
+    risk > 40 ? 'High because the IP is anomalous, but the final score stayed below the critical threshold.' :
+    'Medium because the model saw some unusual behaviour, but not enough supporting signals for high/critical.';
+
+  return `<div class="ml-explain">
+    <div class="ml-explain-title">Actual reason this IP got ${risk}/100 (${mlRiskLabel(risk)})</div>
+    <p><b>Short answer:</b> ${finalReason}</p>
+    <p><b>Verdict:</b> ${verdict}</p>
+    <p><b>Confidence:</b> ${confidence}/100 (${confidenceLabel(confidence)}). ${confidenceReason}</p>
+    <div class="ml-formula">calculation: anomaly_score ${score ?? 'n/a'} → base_risk ${baseRisk}; baseline boost ${baselineBoost}; final risk ${risk}/100</div>
+    <div class="ml-driver-list">${drivers.map(d=>`<div class="ml-driver ${d.level}">${d.text}</div>`).join('')}</div>
+  </div>`;
+}
+function openMLScore(ip) {
+  nav('ml');
+  document.getElementById('ml-ip').value = ip;
+  scoreIP(ip);
+}
+async function scoreIP(ipOverride=null){
+  const ip=ipOverride || document.getElementById('ml-ip').value.trim(); if(!ip)return;
+  document.getElementById('ml-ip').value = ip;
+  const r=await get(`${ML}/score/${ip}`); if(!r)return;
+  document.getElementById('score-panel').style.display='block';
+  const rc=r.risk_score>70?'var(--danger)':r.risk_score>40?'var(--warn)':'var(--ok)';
+  const conf = computeConfidence(r);
+  document.getElementById('score-body').innerHTML=`
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px">
+      <div><div style="font-size:11px;color:var(--muted)">Risk score</div><div style="font-size:40px;font-weight:700;color:${rc}">${r.risk_score??'—'}/100</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Anomaly score</div><div style="font-size:28px;font-weight:700">${r.anomaly_score??'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Confidence</div><div style="font-size:28px;font-weight:700;color:${confidenceColor(conf)}">${conf}/100</div><div style="font-size:11px;color:var(--muted)">${confidenceLabel(conf)}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Anomaly</div><div style="font-size:22px;font-weight:700;color:${r.is_anomaly?'var(--danger)':'var(--ok)'}">${r.is_anomaly?'YES':'No'}</div></div>
+    </div>
+    ${r.features?`<div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:2.2">
+      Events: <b>${r.features.n_events}</b> &nbsp;|&nbsp;
+      Rate: <b>${r.features.event_rate_pm}/min</b> &nbsp;|&nbsp;
+      Unique dst IPs: <b>${r.features.unique_dst_ips}</b> &nbsp;|&nbsp;
+      Unique ports: <b>${r.features.unique_dst_ports}</b><br>
+      Brute force: <b>${r.features.brute_force_cnt}</b> &nbsp;|&nbsp;
+      SSH BF: <b>${r.features.ssh_bf_cnt}</b> &nbsp;|&nbsp;
+      RDP: <b>${r.features.rdp_cnt}</b> &nbsp;|&nbsp;
+      DB scans: <b>${r.features.db_scan_cnt}</b><br>
+      <span style="color:var(--warn)">Baseline alerts: <b>${r.features.baseline_alerts}</b> &nbsp;|&nbsp; Critical alerts: <b>${r.features.critical_alerts}</b></span>
+    </div>`:''}
+    ${r.note?`<div style="margin-top:8px;color:var(--warn);font-size:12px">${r.note}</div>`:''}
+    ${r.anomaly_score!==undefined && r.risk_score!==undefined ? explainMLScore(r) : ''}`;
+}
+async function loadAnomalies(){
+  const r=await get(`${ML}/anomalies`); if(!r)return;
+  document.getElementById('anom-tbody').innerHTML=r.anomalies.length
+    ?r.anomalies.map(a=>`<tr onclick="openMLScore('${a.ip}')" style="cursor:pointer">
+      <td style="color:var(--accent)">${a.ip}</td>
+      <td><span style="color:${a.risk_score>70?'var(--danger)':a.risk_score>40?'var(--warn)':'var(--ok)'};font-weight:700">${a.risk_score??'—'}</span>/100</td>
+      <td style="color:var(--muted)">${a.anomaly_score??'—'}</td>
+      <td><span class="badge ${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}">${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}</span></td>
+      <td><button class="btn" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();openMLScore('${a.ip}')">Explain</button></td>
+    </tr>`).join('')
+    :'<tr><td colspan="5" class="empty">Train the model first</td></tr>';
+}
+async function loadClusters(){
+  const r=await get(`${ML}/clusters`); if(!r)return;
+  if(!r.clusters.length){document.getElementById('clusters-body').innerHTML='<div class="card"><div class="cb empty">No clusters found</div></div>'; return;}
+  const max=Math.max(...r.clusters.map(c=>c.total_events));
+  document.getElementById('clusters-body').innerHTML=`<div class="card">
+    <div class="ch"><span class="ct">Coordinated attack clusters</span><span style="font-size:11px;color:var(--muted)">${r.clusters.length} clusters</span></div>
+    <div class="cb">${r.clusters.map(c=>`
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;background:var(--bg3);border-radius:6px;padding:12px">
+        <div style="min-width:150px"><div style="font-family:var(--mono);font-size:13px;font-weight:600">${c.subnet}</div><div style="font-size:10px;color:var(--muted)">${c.ip_count} IPs</div></div>
+        <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px"><div style="height:100%;border-radius:3px;width:${Math.round(c.total_events/max*100)}%;background:${c.threat_level==='critical'?'var(--danger)':c.threat_level==='high'?'var(--warn)':'var(--accent)'}"></div></div>
+        <div style="font-size:12px;color:var(--muted);min-width:80px;text-align:right">${c.total_events.toLocaleString()} events</div>
+        <span class="badge ${c.threat_level}">${c.threat_level}</span>
       </div>
-    </div>`;
+      <div style="padding:0 12px 10px;font-size:11px;color:var(--muted);font-family:var(--mono)">${c.ips.join(', ')}</div>`).join('')}
+    </div></div>`;
 }
-
-// ─── Blocklist ───────────────────────────────────────────────────────────────
-
-async function loadBlocklist() {
-  const r = await apiFetch(`${API}/blocklist`);
-  if (!r) return;
-  document.getElementById('block-count').textContent = r.count + ' IPs';
-  const body = document.getElementById('blocklist-body');
-  if (!r.ips.length) {
-    body.innerHTML = '<div style="color:var(--muted);font-size:12px">No IPs blocked yet</div>';
-    return;
-  }
-  body.innerHTML = r.ips.map(ip => `
-    <div class="block-row">
-      <span class="block-ip">${ip}</span>
-      <span class="block-src">auto</span>
-      <button class="btn" style="font-size:10px;padding:3px 8px" onclick="unblock('${ip}')">Unblock</button>
-      <button class="btn" style="font-size:10px;padding:3px 8px" onclick="loadIPDetail('${ip}')">Trail</button>
-    </div>`).join('');
+async function loadBlocklist(){
+  const r=await get(`${API}/blocklist`); if(!r)return;
+  document.getElementById('bl-count').textContent=r.count+' IPs';
+  document.getElementById('bl-body').innerHTML=r.ips.length
+    ?r.ips.map(ip=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(48,54,61,.4)">
+        <span style="font-family:var(--mono);font-size:12px;flex:1">${ip}</span>
+        <button class="btn" style="font-size:10px;padding:3px 8px" onclick="unblockIP('${ip}')">Unblock</button>
+        <button class="btn" style="font-size:10px;padding:3px 8px" onclick="goTrail('${ip}')">Trail</button>
+      </div>`).join('')
+    :'<span style="color:var(--muted);font-size:12px">No IPs blocked</span>';
 }
-
-async function manualBlock() {
-  const ip = document.getElementById('block-ip-input').value.trim();
-  if (!ip) return;
-  await apiFetch(`${API}/blocklist/add`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ip}) });
-  toast(ip + ' blocked', 'ok');
-  document.getElementById('block-ip-input').value = '';
-  await loadBlocklist();
+async function manualBlock(){
+  const ip=document.getElementById('block-ip').value.trim(); if(!ip)return;
+  await post(`${API}/blocklist/add`,{ip});
+  toast(ip+' blocked','ok'); document.getElementById('block-ip').value=''; await loadBlocklist();
 }
-
-async function unblock(ip) {
-  await apiFetch(`${API}/blocklist/${ip}`, { method:'DELETE' });
-  toast(ip + ' unblocked', 'warn');
-  await loadBlocklist();
-}
-
-// ─── Ingest ──────────────────────────────────────────────────────────────────
-
-function dragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
-function dragLeave()  { document.getElementById('drop-zone').classList.remove('drag'); }
-function dropFile(e)  { e.preventDefault(); dragLeave(); const f = e.dataTransfer.files[0]; if(f) uploadCSV(f); }
-
-async function uploadCSV(file) {
-  if (!file) return;
-  const wrap = document.getElementById('progress-wrap');
-  const bar  = document.getElementById('progress-bar');
-  const stat = document.getElementById('upload-status');
-  wrap.style.display = 'block';
-  bar.style.width = '30%';
-  stat.textContent = `Uploading ${file.name} (${(file.size/1024).toFixed(0)} KB)…`;
-
-  const fd = new FormData();
-  fd.append('file', file);
-  bar.style.width = '60%';
-
-  const r = await apiFetch(`${API}/ingest/csv`, { method:'POST', body: fd });
-  bar.style.width = '100%';
-  if (r) {
-    stat.textContent = `Ingesting ${r.rows.toLocaleString()} rows in background…`;
-    toast(`Ingestion started: ${r.rows} rows`, 'ok');
-    setTimeout(() => { bar.style.width='0%'; wrap.style.display='none'; }, 2000);
-    setTimeout(refreshAll, 5000);
+async function unblockIP(ip){await del(`${API}/blocklist/${ip}`); toast(ip+' unblocked','warn'); await loadBlocklist();}
+function dragOver(e){e.preventDefault(); document.getElementById('drop-zone').classList.add('drag');}
+function dragLeave(){document.getElementById('drop-zone').classList.remove('drag');}
+function dropFile(e){e.preventDefault(); dragLeave(); const f=e.dataTransfer.files[0]; if(f)uploadCSV(f);}
+async function uploadCSV(file){
+  if(!file)return;
+  const wrap=document.getElementById('prog-wrap'), bar=document.getElementById('prog-bar'), stat=document.getElementById('upload-status');
+  wrap.style.display='block'; bar.style.width='30%';
+  stat.textContent=`Uploading ${file.name} (${(file.size/1024).toFixed(0)} KB)…`;
+  const fd=new FormData(); fd.append('file',file); bar.style.width='60%';
+  const r=await postForm(`${API}/ingest/csv`,fd);
+  bar.style.width='100%';
+  if(r){
+    stat.textContent=`Ingesting ${r.rows.toLocaleString()} rows in background… (builds baselines automatically after)`;
+    toast(`Ingestion started: ${r.rows} rows`,'ok');
+    setTimeout(()=>{bar.style.width='0%'; wrap.style.display='none';},2000);
+    setTimeout(refreshAll,8000);
   }
 }
-
-async function ingestSingleLog() {
-  const raw = document.getElementById('json-log').value.trim();
-  if (!raw) return;
-  try {
-    const log = JSON.parse(raw);
-    const r = await apiFetch(`${API}/ingest/log`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(log) });
-    if (r) { toast('Log ingested', 'ok'); setTimeout(refreshAll, 1000); }
-  } catch(e) {
-    toast('Invalid JSON: ' + e.message, 'err');
-  }
+async function ingestJSON(){
+  const raw=document.getElementById('json-log').value.trim(); if(!raw)return;
+  try{
+    const r=await post(`${API}/ingest/log`,JSON.parse(raw));
+    if(r){toast('Log ingested','ok'); setTimeout(refreshAll,1000);}
+  }catch(e){toast('Invalid JSON: '+e.message,'err');}
 }
-
-// ─── Init ────────────────────────────────────────────────────────────────────
 refreshAll();
-// Auto-refresh every 30 seconds
-setInterval(refreshAll, 30000);
+setInterval(refreshAll,30000);
 </script>
 </body>
 </html>
