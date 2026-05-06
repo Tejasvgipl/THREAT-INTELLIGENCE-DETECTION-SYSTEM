@@ -17,6 +17,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 REDIS_HOST    = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT    = int(os.getenv("REDIS_PORT", 6379))
 ABUSEIPDB_KEY = os.getenv("ABUSEIPDB_KEY", "demo")
+GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL    = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
 TRAIL_TTL     = 60 * 60 * 24 * 30
 BASELINE_TTL  = 60 * 60 * 24 * 90
 ALERT_TTL     = 60 * 60 * 24 * 7
@@ -30,6 +33,32 @@ async def get_redis() -> aioredis.Redis:
     if _redis is None:
         _redis = aioredis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
     return _redis
+
+async def ask_groq(prompt: str, max_tokens: int = 700) -> str:
+    if not GROQ_API_KEY:
+        return "AI API key is not configured. Add the AI key to .env and restart the backend."
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                GROQ_URL,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens,
+                    "temperature": 0.2,
+                },
+            )
+            data = resp.json()
+            if resp.status_code >= 400 or "choices" not in data:
+                msg = data.get("error", {}).get("message", f"HTTP {resp.status_code}")
+                return f"AI provider error: {msg}"
+            return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"AI provider unavailable: {e}"
 
 # ── constants ─────────────────────────────────────────────────────────────────
 
@@ -195,7 +224,6 @@ async def build_baseline(r: aioredis.Redis, ip: str):
     }
 
     await r.set(f"baseline:{ip}", json.dumps(baseline))
-    await r.expire(f"baseline:{ip}", BASELINE_TTL)
 
 # ── deviation detector ────────────────────────────────────────────────────────
 
@@ -297,7 +325,6 @@ async def detect_deviations(r: aioredis.Redis, ip: str, event: dict, ts: float) 
     try:
         day_key   = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
         today_cnt = await r.hincrby(f"daily:{ip}", day_key, 1)
-        await r.expire(f"daily:{ip}", BASELINE_TTL)
         avg_daily = b.get("avg_daily_events", 0)
         if avg_daily > 5 and today_cnt > avg_daily * VOLUME_SPIKE_MULTIPLIER:
             alerts.append(alert("volume_spike",
@@ -366,12 +393,10 @@ async def save_alerts(r: aioredis.Redis, ip: str, alerts: list):
     for a in alerts:
         key = f"alert:{ip}:{a['type']}"
         pipe.set(key, json.dumps(a))
-        pipe.expire(key, ALERT_TTL)
         pipe.incr("stat:total_alerts")
         pipe.incr(f"stat:alert_type:{a['type']}")
         if a["severity"] == "critical":
             pipe.sadd("critical_alerts", ip)
-            pipe.expire("critical_alerts", 3600)
     await pipe.execute()
 
 
@@ -407,19 +432,15 @@ async def ingest_log_row(r: aioredis.Redis, row: dict):
 
     pipe = r.pipeline()
     pipe.zadd(f"trail:{src_ip}", {json.dumps(event): score})
-    pipe.expire(f"trail:{src_ip}", TRAIL_TTL)
     pipe.hincrby(f"ipstat:{src_ip}", classification["threat_type"], 1)
     pipe.hincrby(f"ipstat:{src_ip}", "total", 1)
-    pipe.expire(f"ipstat:{src_ip}", TRAIL_TTL)
     pipe.incr("stat:total_logs")
     pipe.incr(f"stat:threat:{classification['threat_type']}")
     if classification["severity"] in ("critical","high"):
         pipe.sadd("hot_ips", src_ip)
-        pipe.expire("hot_ips", 3600)
     for subnet in KNOWN_BAD_SUBNETS:
         if src_ip.startswith(subnet):
             pipe.sadd("blocklist:auto", src_ip)
-            pipe.expire("blocklist:auto", 86400)
             break
     await pipe.execute()
 
@@ -526,6 +547,62 @@ async def trail_summary(ip: str):
     }
 
 
+async def rebuild_runtime_indexes(r: aioredis.Redis) -> dict:
+    """Rebuild non-source-of-truth sets if Redis TTLs or old containers dropped them."""
+    trail_keys = await r.keys("trail:*")
+    hot_ips = set()
+    auto_block = set()
+
+    for key in trail_keys:
+        ip = key.replace("trail:","")
+        if any(ip.startswith(subnet) for subnet in KNOWN_BAD_SUBNETS):
+            auto_block.add(ip)
+
+        raw_events = await r.zrange(key, 0, -1)
+        for item in raw_events:
+            try:
+                event = json.loads(item)
+            except Exception:
+                continue
+            if event.get("severity") in ("critical","high"):
+                hot_ips.add(ip)
+                break
+
+    critical_ips = set()
+    alert_keys = await r.keys("alert:*")
+    for key in alert_keys:
+        val = await r.get(key)
+        if not val:
+            continue
+        try:
+            alert = json.loads(val)
+        except Exception:
+            continue
+        if alert.get("severity") == "critical" and alert.get("ip"):
+            critical_ips.add(alert["ip"])
+
+    pipe = r.pipeline()
+    pipe.delete("hot_ips", "critical_alerts", "blocklist:auto")
+    for ip in hot_ips:
+        pipe.sadd("hot_ips", ip)
+    for ip in critical_ips:
+        pipe.sadd("critical_alerts", ip)
+    for ip in auto_block:
+        pipe.sadd("blocklist:auto", ip)
+    baseline_keys = await r.keys("baseline:*")
+    daily_keys = await r.keys("daily:*")
+    ipstat_keys = await r.keys("ipstat:*")
+    for key in trail_keys + alert_keys + baseline_keys + daily_keys + ipstat_keys:
+        pipe.persist(key)
+    await pipe.execute()
+
+    return {
+        "hot_ips": len(hot_ips),
+        "critical_ips": len(critical_ips),
+        "auto_blocked": len(auto_block),
+    }
+
+
 # ── baselines ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/baseline/{ip}")
@@ -593,6 +670,207 @@ async def get_ip_alerts(ip: str):
     return {"ip":ip,"alerts":alerts,"total":len(alerts)}
 
 
+# ── AI explanations ──────────────────────────────────────────────────────────
+
+async def collect_ip_context(r: aioredis.Redis, ip: str) -> dict:
+    raw_trail = await r.zrange(f"trail:{ip}", -40, -1)
+    events = []
+    for item in raw_trail:
+        try:
+            events.append(json.loads(item))
+        except Exception:
+            pass
+
+    alert_keys = await r.keys(f"alert:{ip}:*")
+    alerts = []
+    for key in alert_keys:
+        val = await r.get(key)
+        if val:
+            try:
+                alerts.append(json.loads(val))
+            except Exception:
+                pass
+    alerts.sort(key=lambda x: x.get("ts",""), reverse=True)
+
+    bsl_raw = await r.get(f"baseline:{ip}")
+    ml_raw = await r.get(f"ml:score:{ip}")
+    return {
+        "events": events,
+        "alerts": alerts,
+        "baseline": json.loads(bsl_raw) if bsl_raw else {},
+        "ml": json.loads(ml_raw) if ml_raw else {},
+        "stats": await r.hgetall(f"ipstat:{ip}"),
+    }
+
+
+@app.get("/api/explain/alert/{ip}/{alert_type}")
+async def explain_alert(ip: str, alert_type: str):
+    r = await get_redis()
+    alert_raw = await r.get(f"alert:{ip}:{alert_type}")
+    if not alert_raw:
+        raise HTTPException(404, "Alert not found")
+
+    alert = json.loads(alert_raw)
+    ctx = await collect_ip_context(r, ip)
+    b = ctx["baseline"]
+
+    prompt = f"""You are a senior SOC analyst at a bank.
+
+Explain this baseline deviation alert in plain English. Use only the evidence below.
+
+IP: {ip}
+Alert type: {alert_type}
+Alert message: {alert.get('message')}
+Severity: {alert.get('severity')}
+Details: {json.dumps(alert.get('details', {}))}
+Fired at: {alert.get('ts')}
+
+Normal baseline:
+- Usual ports: {list(b.get('usual_ports', {}).keys())}
+- Usual countries: {list(b.get('usual_countries', {}).keys())}
+- Usual hours UTC: {list(b.get('usual_hours', {}).keys())}
+- Avg daily events: {b.get('avg_daily_events', 'unknown')}
+- Prior failures: {b.get('total_failures', 0)}
+- Prior successes: {b.get('total_successes', 0)}
+
+Recent events:
+{json.dumps(ctx['events'][-15:], indent=2)}
+
+Write 3 short paragraphs with these exact headings:
+WHAT THIS ALERT MEANS:
+WHY IT IS {str(alert.get('severity', 'UNKNOWN')).upper()}:
+WHAT TO DO:
+
+Be specific to this IP and these values. Do not give generic textbook text."""
+
+    return {
+        "ip": ip,
+        "alert_type": alert_type,
+        "alert": alert,
+        "explanation": await ask_groq(prompt, max_tokens=550),
+        "model": GROQ_MODEL,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/explain/ml/{ip}")
+async def explain_ml_score(ip: str):
+    r = await get_redis()
+    ctx = await collect_ip_context(r, ip)
+    ml = ctx["ml"]
+    if not ml:
+        raise HTTPException(404, "No ML score found. Run /api/ml/train or score this IP first.")
+
+    b = ctx["baseline"]
+    prompt = f"""You are a senior SOC analyst who understands ML but explains it simply.
+
+Explain why the ML model scored this IP as anomalous. Use the actual numbers below.
+
+IP: {ip}
+Risk score: {ml.get('risk_score')}/100
+Anomaly score: {ml.get('anomaly_score')} (negative means more unusual)
+Is anomaly: {ml.get('is_anomaly')}
+
+Feature values used by the model:
+{json.dumps(ml.get('features', {}), indent=2)}
+
+Baseline context:
+- Avg daily events: {b.get('avg_daily_events', 'no baseline')}
+- Avg severity score: {b.get('avg_severity_score', 'no baseline')}
+- Usual threat types: {list(b.get('usual_rule_groups', {}).keys())}
+- Baseline deviation alerts: {len(ctx['alerts'])}
+
+Write 3 short paragraphs with these exact headings:
+WHY THIS SCORE:
+WHAT THE ANOMALY SCORE MEANS:
+CONFIDENCE:
+
+Do not say the model knows the IP is bad. Explain that Isolation Forest finds outliers, then connect the outlier decision to the concrete feature values."""
+
+    return {
+        "ip": ip,
+        "ml": ml,
+        "explanation": await ask_groq(prompt, max_tokens=650),
+        "model": GROQ_MODEL,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.post("/api/explain/pattern")
+async def explain_unknown_pattern(payload: dict):
+    data = payload.get("data", {})
+    context = payload.get("context", "")
+    prompt = f"""You are a senior SOC analyst at a bank security operations centre.
+
+Analyse this security pattern using the provided data.
+
+Context: {context}
+
+Data:
+{json.dumps(data, indent=2)}
+
+Write a clear threat analysis with these headings:
+PATTERN:
+KNOWN TECHNIQUE:
+RISK:
+ACTION:
+
+Be specific to the actual values. Do not be generic."""
+    return {
+        "explanation": await ask_groq(prompt, max_tokens=550),
+        "model": GROQ_MODEL,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/explain/{ip}")
+async def explain_ip(ip: str):
+    r = await get_redis()
+    ctx = await collect_ip_context(r, ip)
+    b = ctx["baseline"]
+    ml = ctx["ml"]
+
+    prompt = f"""You are a senior SOC analyst at a bank.
+
+Analyse this IP and write a plain-English threat report. Use the actual evidence below.
+
+IP: {ip}
+ML risk score: {ml.get('risk_score', 'not scored')}/100
+Anomaly score: {ml.get('anomaly_score', 'not scored')}
+Is anomaly: {ml.get('is_anomaly', False)}
+Event counts by type: {json.dumps(ctx['stats'])}
+
+Recent events:
+{json.dumps(ctx['events'][-30:], indent=2)}
+
+Baseline deviation alerts:
+{json.dumps(ctx['alerts'][:8], indent=2)}
+
+Normal baseline:
+- Avg daily events: {b.get('avg_daily_events', 'unknown')}
+- Usual countries: {list(b.get('usual_countries', {}).keys())}
+- Usual ports: {list(b.get('usual_ports', {}).keys())}
+- Usual hours UTC: {list(b.get('usual_hours', {}).keys())}
+- Total prior failures: {b.get('total_failures', 0)}
+- Total prior successes: {b.get('total_successes', 0)}
+
+Write exactly 4 short paragraphs with these exact headings:
+WHAT HAPPENED:
+WHY IT IS DANGEROUS:
+WHAT CHANGED:
+IMMEDIATE ACTION:
+
+Reference the actual data. If evidence is missing, say what is missing instead of inventing it."""
+
+    return {
+        "ip": ip,
+        "explanation": await ask_groq(prompt, max_tokens=850),
+        "risk_score": ml.get("risk_score"),
+        "model": GROQ_MODEL,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ── stats ─────────────────────────────────────────────────────────────────────
 
 @app.get("/api/stats")
@@ -607,6 +885,12 @@ async def get_stats():
     pipe.smembers("critical_alerts")
     results = await pipe.execute()
     total, hot_ips, blocklist, trail_keys, total_alerts, critical_ips = results
+
+    if trail_keys and (not hot_ips or not blocklist or (int(total_alerts or 0) > 0 and not critical_ips)):
+        await rebuild_runtime_indexes(r)
+        hot_ips = await r.smembers("hot_ips")
+        blocklist = await r.smembers("blocklist:auto")
+        critical_ips = await r.smembers("critical_alerts")
 
     threat_keys = await r.keys("stat:threat:*")
     threat_counts = {}
@@ -629,6 +913,7 @@ async def get_stats():
         "total_alerts":     int(total_alerts or 0),
         "critical_ips":     list(critical_ips or []),
         "alert_type_counts":alert_counts,
+        "ai_configured":    bool(GROQ_API_KEY),
     }
 
 
@@ -636,6 +921,9 @@ async def get_stats():
 async def get_hot_ips():
     r   = await get_redis()
     hot = await r.smembers("hot_ips")
+    if not hot:
+        await rebuild_runtime_indexes(r)
+        hot = await r.smembers("hot_ips")
     result = []
     for ip in list(hot)[:50]:
         summary = await trail_summary(ip)
@@ -727,4 +1015,9 @@ async def search_ip(q: str):
 
 @app.get("/api/health")
 async def health():
-    return {"status":"ok","version":"2.0.0","time":datetime.now(timezone.utc).isoformat()}
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "ai": "configured" if GROQ_API_KEY else "missing",
+        "time": datetime.now(timezone.utc).isoformat(),
+    }

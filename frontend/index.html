@@ -1,933 +1,3139 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CyberSentinel v2</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--danger:#f85149;--warn:#e3b341;--ok:#3fb950;--purple:#bc8cff;--mono:'Courier New',monospace}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
-.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
-.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
-.main{overflow-y:auto}
-.logo{padding:16px 20px;border-bottom:1px solid var(--border)}
-.logo-title{font-size:16px;font-weight:700}
-.logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
-.nav{padding:12px 0;flex:1}
-.ns{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 20px 4px}
-.ni{display:flex;align-items:center;gap:10px;padding:8px 20px;cursor:pointer;color:var(--muted);font-size:13px;border-left:2px solid transparent}
-.ni:hover{background:var(--bg3);color:var(--text)}
-.ni.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.06)}
-.ndot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.nd-r{background:var(--danger)}.nd-w{background:var(--warn)}.nd-g{background:var(--ok)}.nd-p{background:var(--purple)}
-.sfooter{padding:12px 20px;border-top:1px solid var(--border)}
-.srow{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:4px}
-.pulse{width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.topbar{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:10}
-.topbar h1{font-size:16px;font-weight:600;flex:1}
-.srch{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 12px;flex:1;max-width:300px}
-.srch input{background:none;border:none;outline:none;color:var(--text);font-size:13px;flex:1}
-.srch input::placeholder{color:var(--muted)}
-.btn{padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer}
-.btn:hover{background:var(--border)}
-.btn.pri{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
-.btn.red{background:var(--danger);color:#fff;border-color:var(--danger)}
-.btn.yel{background:var(--warn);color:#000;border-color:var(--warn)}
-.page{display:none;padding:24px}.page.active{display:block}
-.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:24px}
-.metric{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px}
-.mlabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.mval{font-size:28px;font-weight:700}
-.mv-a{color:var(--accent)}.mv-d{color:var(--danger)}.mv-w{color:var(--warn)}.mv-g{color:var(--ok)}.mv-p{color:var(--purple)}
-.msub{font-size:11px;color:var(--muted);margin-top:4px}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:16px}
-.ch{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
-.ct{font-size:13px;font-weight:600}
-.cb{padding:16px}
-.tbl{width:100%;border-collapse:collapse;font-size:12px}
-.tbl th{text-align:left;padding:8px 12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;font-size:11px;text-transform:uppercase}
-.tbl td{padding:9px 12px;border-bottom:1px solid rgba(48,54,61,.5);font-family:var(--mono)}
-.tbl tr:hover td{background:var(--bg3)}
-.tbl tr:last-child td{border-bottom:none}
-.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:12px;text-transform:uppercase}
-.badge.critical{background:rgba(248,81,73,.18);color:#f85149}
-.badge.high{background:rgba(227,179,65,.18);color:#e3b341}
-.badge.medium{background:rgba(88,166,255,.18);color:#58a6ff}
-.badge.low{background:rgba(63,185,80,.18);color:#3fb950}
-.badge.blocked{background:rgba(188,140,255,.18);color:#bc8cff}
-.cg2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.cg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
-.cbox{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px}
-.cbox h3{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em}
-.cwrap{position:relative;height:200px}
-.tlist{max-height:460px;overflow-y:auto}
-.ti{display:flex;align-items:flex-start;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(48,54,61,.4)}
-.ti:last-child{border-bottom:none}
-.tdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
-.tdot.critical{background:var(--danger)}.tdot.high{background:var(--warn)}.tdot.medium{background:var(--accent)}.tdot.low{background:var(--ok)}
-.tts{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:140px;flex-shrink:0}
-.tdesc{font-size:12px;color:var(--muted);flex:1;line-height:1.5}
-.tdesc b{color:var(--text);font-weight:500}
-.ip-panel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
-.ip-hdr{display:flex;align-items:center;gap:16px;margin-bottom:16px}
-.ip-big{font-family:var(--mono);font-size:20px;font-weight:700}
-.ip-mg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-.ipm{background:var(--bg3);border-radius:6px;padding:10px}
-.ipm-l{font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
-.ipm-v{font-size:15px;font-weight:600}
-.dev-row{display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-bottom:1px solid rgba(48,54,61,.4)}
-.dev-row:last-child{border-bottom:none}
-.dev-ip{font-family:var(--mono);font-size:12px;color:var(--accent);min-width:130px;flex-shrink:0;cursor:pointer}
-.dev-type{font-size:11px;font-family:var(--mono);min-width:180px;flex-shrink:0}
-.dev-msg{font-size:12px;color:var(--muted);flex:1;line-height:1.4}
-.dev-ts{font-size:10px;color:var(--muted);min-width:65px;text-align:right}
-.bsl-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.bsl-box{background:var(--bg3);border-radius:8px;padding:12px;text-align:center}
-.bsl-box-val{font-size:24px;font-weight:700;margin-bottom:4px}
-.bsl-box-lbl{font-size:11px;color:var(--muted)}
-.bsl-section{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .4rem}
-.bsl-tags{display:flex;gap:6px;flex-wrap:wrap}
-.bsl-tag{font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(88,166,255,.12);color:var(--accent)}
-.bsl-tag.warn{background:rgba(227,179,65,.12);color:var(--warn)}
-.bsl-tag.ok{background:rgba(63,185,80,.12);color:var(--ok)}
-.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;cursor:pointer;transition:border-color .2s}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--accent)}
-.prog-wrap{background:var(--bg3);border-radius:4px;height:6px;margin-top:12px;overflow:hidden;display:none}
-.prog-bar{height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
-.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px}
-.toast{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 16px;font-size:12px;animation:slideIn .2s ease;max-width:300px}
-.toast.ok{border-left:3px solid var(--ok)}.toast.err{border-left:3px solid var(--danger)}.toast.warn{border-left:3px solid var(--warn)}
-@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
-.empty{padding:24px;text-align:center;color:var(--muted);font-size:12px}
-.alert-card{background:var(--bg3);border-radius:8px;margin:8px 16px;padding:12px 14px;border-left:3px solid var(--border)}
-.alert-card.critical{border-left-color:var(--danger)}
-.alert-card.high{border-left-color:var(--warn)}
-.alert-card.medium{border-left-color:var(--accent)}
-.alert-card.low{border-left-color:var(--ok)}
-.alert-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.alert-type-label{font-size:12px;font-weight:700;font-family:var(--mono)}
-.alert-ip-label{font-family:var(--mono);font-size:12px;color:var(--accent);cursor:pointer;margin-right:auto}
-.alert-time{font-size:10px;color:var(--muted)}
-.alert-message{font-size:12px;color:var(--text);margin-bottom:6px;line-height:1.5}
-.alert-why{font-size:11px;color:var(--muted);line-height:1.6;background:var(--bg2);border-radius:5px;padding:7px 10px;margin-bottom:6px;border:.5px solid var(--border)}
-.alert-why b{color:var(--warn)}
-.alert-action{font-size:11px;font-weight:600;padding:3px 0}
-.alert-action.critical{color:var(--danger)}
-.alert-action.high{color:var(--warn)}
-.alert-action.medium{color:var(--accent)}
-.alert-action.low{color:var(--ok)}
-.alert-details{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px}
-.alert-detail-chip{font-size:10px;font-family:var(--mono);padding:1px 7px;border-radius:4px;background:var(--bg2);color:var(--muted);border:.5px solid var(--border)}
-.ml-explain{margin-top:14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:13px 14px}
-.ml-explain-title{font-size:12px;font-weight:700;margin-bottom:7px;color:var(--text)}
-.ml-explain p{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px}
-.ml-driver-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:10px}
-.ml-driver{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.5;color:var(--muted)}
-.ml-driver b{color:var(--text)}
-.ml-driver.critical{border-left:3px solid var(--danger)}
-.ml-driver.high{border-left:3px solid var(--warn)}
-.ml-driver.medium{border-left:3px solid var(--accent)}
-.ml-formula{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg2);border-radius:5px;padding:7px 9px;border:1px solid var(--border)}
-.term-panel{background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.22);border-radius:8px;padding:13px 15px;margin-bottom:16px}
-.term-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px}
-.term-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
-.term{font-size:12px;color:var(--muted);line-height:1.55;background:rgba(13,17,23,.45);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
-.term b{color:var(--accent)}
-.ip-chip{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(248,81,73,.12);color:var(--danger);margin:2px;cursor:pointer}
-.ip-chip:hover{background:rgba(248,81,73,.25)}
-</style>
-</head>
-<body>
-<div class="shell">
-<aside class="sidebar">
-  <div class="logo">
-    <div class="logo-title">CyberSentinel</div>
-    <div class="logo-sub">Threat Intelligence v2.0</div>
-  </div>
-  <nav class="nav">
-    <div class="ns">Monitor</div>
-    <div class="ni active" onclick="nav('overview')"><span class="ndot nd-r"></span>Overview</div>
-    <div class="ni" onclick="nav('trail')"><span class="ndot nd-w"></span>IP Trail</div>
-    <div class="ni" onclick="nav('livealerts')"><span class="ndot nd-r"></span>Live Alerts</div>
-    <div class="ns">Baselines</div>
-    <div class="ni" onclick="nav('deviations')"><span class="ndot nd-r"></span>Deviations</div>
-    <div class="ni" onclick="nav('bslexplorer')"><span class="ndot nd-w"></span>Baseline Explorer</div>
-    <div class="ns">Detection</div>
-    <div class="ni" onclick="nav('ml')"><span class="ndot nd-g"></span>ML Anomaly</div>
-    <div class="ni" onclick="nav('clusters')"><span class="ndot nd-w"></span>Subnet Clusters</div>
-    <div class="ns">Control</div>
-    <div class="ni" onclick="nav('blocklist')"><span class="ndot nd-r"></span>Blocklist</div>
-    <div class="ni" onclick="nav('ingest')"><span class="ndot nd-g"></span>Ingest Logs</div>
-  </nav>
-  <div class="sfooter">
-    <div class="srow"><span class="pulse"></span>Backend API</div>
-    <div class="srow" id="ml-status"><span style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> ML Engine</div>
-    <div style="font-size:10px;color:var(--muted);margin-top:6px" id="last-ref">—</div>
-  </div>
-</aside>
-<main class="main">
-<div class="topbar">
-  <h1 id="page-title">Overview</h1>
-  <div class="srch">
-    <svg width="13" height="13" fill="none" stroke="var(--muted)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
-    <input id="ip-search" placeholder="Search IP…" onkeydown="if(event.key==='Enter')doSearch()"/>
-  </div>
-  <button class="btn" onclick="doSearch()">Search</button>
-  <button class="btn pri" onclick="refreshAll()">↻ Refresh</button>
-</div>
-<div id="page-overview" class="page active">
-  <div class="mg">
-    <div class="metric"><div class="mlabel">Total logs</div><div class="mval mv-a" id="m-total">—</div><div class="msub">ingested</div></div>
-    <div class="metric"><div class="mlabel">Unique IPs</div><div class="mval mv-a" id="m-ips">—</div><div class="msub">tracked</div></div>
-    <div class="metric"><div class="mlabel">Hot IPs</div><div class="mval mv-d" id="m-hot">—</div><div class="msub">high/critical</div></div>
-    <div class="metric"><div class="mlabel">Baseline alerts</div><div class="mval mv-d" id="m-balerts">—</div><div class="msub">deviations fired</div></div>
-    <div class="metric"><div class="mlabel">Critical IPs</div><div class="mval mv-d" id="m-crit">—</div><div class="msub">P0 flagged</div></div>
-    <div class="metric"><div class="mlabel">Auto-blocked</div><div class="mval mv-w" id="m-blocked">—</div><div class="msub">bad subnets</div></div>
-  </div>
-  <div class="cg2">
-    <div class="cbox"><h3>Threat types</h3><div class="cwrap"><canvas id="ch-threats"></canvas></div></div>
-    <div class="cbox"><h3>Baseline deviation types</h3><div class="cwrap"><canvas id="ch-devtypes"></canvas></div></div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Hot IPs</span><span id="hot-count" style="font-size:11px;color:var(--muted)"></span></div>
-    <table class="tbl">
-      <thead><tr><th>IP</th><th>Events</th><th>First seen</th><th>Last seen</th><th>Top threat</th><th>Severity</th><th></th></tr></thead>
-      <tbody id="hot-tbody"></tbody>
-    </table>
-  </div>
-</div>
-<div id="page-trail" class="page">
-  <div class="card" style="margin-bottom:16px">
-    <div class="cb" style="display:flex;gap:10px">
-      <input id="trail-input" placeholder="Enter IP (e.g. 85.11.187.36)" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-      <button class="btn pri" onclick="loadTrail()">Load trail</button>
-      <button class="btn" onclick="loadIntel()">+ Intel</button>
-      <button class="btn yel" onclick="loadBaseline()">Baseline</button>
-      <button class="btn red" onclick="blockCurrent()">Block IP</button>
-    </div>
-  </div>
-  <div id="trail-panel" style="display:none">
-    <div class="ip-panel">
-      <div class="ip-hdr">
-        <div class="ip-big" id="t-ip">—</div>
-        <span class="badge" id="t-sev-badge">—</span>
-        <span id="t-blocked-badge" style="display:none" class="badge blocked">Blocked</span>
-      </div>
-      <div class="ip-mg">
-        <div class="ipm"><div class="ipm-l">Total events</div><div class="ipm-v mv-a" id="t-total">—</div></div>
-        <div class="ipm"><div class="ipm-l">First seen</div><div class="ipm-v" style="font-size:11px;font-family:var(--mono)" id="t-first">—</div></div>
-        <div class="ipm"><div class="ipm-l">Last seen</div><div class="ipm-v" style="font-size:11px;font-family:var(--mono)" id="t-last">—</div></div>
-        <div class="ipm"><div class="ipm-l">Top threat</div><div class="ipm-v" id="t-threat">—</div></div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap" id="t-badges"></div>
-    </div>
-    <div id="intel-panel" style="display:none" class="card">
-      <div class="ch"><span class="ct">Threat Intel</span></div>
-      <div class="cb" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
-    </div>
-    <div id="bsl-panel" style="display:none" class="card">
-      <div class="ch"><span class="ct">Baseline Profile</span><span id="bsl-alert-count" style="font-size:11px;color:var(--danger)"></span></div>
-      <div class="cb" id="bsl-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
-    </div>
-    <div class="card">
-      <div class="ch"><span class="ct">Event trail — chronological</span></div>
-      <div class="tlist" id="trail-events"></div>
-    </div>
-  </div>
-</div>
-<div id="page-livealerts" class="page">
-  <div style="display:flex;gap:10px;margin-bottom:16px">
-    <button class="btn" onclick="loadLiveAlerts()">↻ Refresh</button>
-    <span style="font-size:12px;color:var(--muted);align-self:center">Events from hot IPs</span>
-  </div>
-  <div class="card">
-    <table class="tbl">
-      <thead><tr><th>Time</th><th>Source IP</th><th>Threat</th><th>Rule</th><th>Severity</th><th>Dst IP</th></tr></thead>
-      <tbody id="live-tbody"></tbody>
-    </table>
-  </div>
-</div>
-<div id="page-deviations" class="page">
-  <div class="term-panel">
-    <div class="term-title">What baseline deviation means</div>
-    <div class="term-grid">
-      <div class="term"><b>Baseline</b> is the normal behaviour learned for an IP: usual ports, hours, destination networks, countries, event volume, and alert types.</div>
-      <div class="term"><b>Deviation</b> means the IP did something outside that normal pattern, like touching a new subnet, using a new admin port, or creating a volume spike.</div>
-      <div class="term"><b>Why SOC cares</b>: deviations are early warning signals for brute force, lateral movement, proxy rotation, or compromised accounts.</div>
-    </div>
-  </div>
-  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-    <button class="btn pri" onclick="loadDeviations()">Load all deviations</button>
-    <button class="btn red" onclick="loadDeviations('critical')">Critical only</button>
-    <button class="btn yel" onclick="loadDeviations('high')">High only</button>
-    <button class="btn" onclick="buildAllBaselines()">↻ Rebuild all baselines</button>
-    <span id="dev-status" style="font-size:12px;color:var(--muted)"></span>
-  </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="ch"><span class="ct">IPs with deviations — click to trail</span><span id="dev-ip-count" style="font-size:11px;color:var(--muted)"></span></div>
-    <div class="cb" id="dev-ip-chips" style="min-height:40px"></div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">All deviation alerts</span><span id="dev-total" style="font-size:11px;color:var(--muted)"></span></div>
-    <div style="max-height:520px;overflow-y:auto" id="dev-list">
-      <div class="empty">Click "Load all deviations" to see baseline alerts</div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Deviation type breakdown</span></div>
-    <div class="cb"><div style="height:220px"><canvas id="ch-devbar"></canvas></div></div>
-  </div>
-</div>
-<div id="page-bslexplorer" class="page">
-  <div class="term-panel">
-    <div class="term-title">How to read a baseline profile</div>
-    <div class="term-grid">
-      <div class="term"><b>Usual hours</b> show when this IP normally appears. Off-hours activity can mean attacker activity or abused automation.</div>
-      <div class="term"><b>Usual ports</b> show expected services. A new SSH/RDP/database port is more suspicious than a repeated normal web port.</div>
-      <div class="term"><b>Deviation alerts</b> are the concrete reasons this IP broke its own behavioural baseline.</div>
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="cb" style="display:flex;gap:10px">
-      <input id="bsl-ip" placeholder="Enter IP to explore its baseline…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-      <button class="btn pri" onclick="exploreBaseline()">Explore</button>
-      <button class="btn" onclick="forceRebuild()">Force rebuild</button>
-    </div>
-  </div>
-  <div id="bsl-explorer-panel" style="display:none">
-    <div class="bsl-stat">
-      <div class="bsl-box"><div class="bsl-box-val mv-a" id="bx-events">—</div><div class="bsl-box-lbl">Events in baseline</div></div>
-      <div class="bsl-box"><div class="bsl-box-val mv-w" id="bx-daily">—</div><div class="bsl-box-lbl">Avg events/day</div></div>
-      <div class="bsl-box"><div class="bsl-box-val mv-d" id="bx-alerts">—</div><div class="bsl-box-lbl">Deviation alerts</div></div>
-    </div>
-    <div class="cg2">
-      <div class="card">
-        <div class="ch"><span class="ct">Usual hours (UTC)</span></div>
-        <div class="cb"><div style="height:180px"><canvas id="ch-hours"></canvas></div></div>
-      </div>
-      <div class="card">
-        <div class="ch"><span class="ct">Usual ports</span></div>
-        <div class="cb"><div style="height:180px"><canvas id="ch-ports"></canvas></div></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="ch"><span class="ct">Baseline profile</span></div>
-      <div class="cb" id="bx-profile" style="font-size:12px;color:var(--muted);line-height:2"></div>
-    </div>
-    <div class="card">
-      <div class="ch"><span class="ct">Deviation alerts for this IP</span></div>
-      <div style="max-height:320px;overflow-y:auto" id="bx-alerts-list"></div>
-    </div>
-  </div>
-</div>
-<div id="page-ml" class="page">
-  <div class="term-panel">
-    <div class="term-title">How to read ML anomaly scoring</div>
-    <div class="term-grid">
-      <div class="term"><b>Anomaly score</b> is the raw Isolation Forest output. Lower/negative means the IP looks more unusual compared with other IPs.</div>
-      <div class="term"><b>Risk score</b> is the SOC-facing 0-100 danger score. It combines ML abnormality plus baseline and threat signals.</div>
-      <div class="term"><b>Confidence</b> says how much evidence supports that risk. Few logs means lower confidence, even if the IP looks suspicious.</div>
-      <div class="term"><b>Isolation Forest</b> finds IPs that are isolated from normal behaviour patterns. It does not know "bad"; it finds outliers.</div>
-    </div>
-  </div>
-  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-    <button class="btn pri" onclick="trainModel()">Train ML model</button>
-    <button class="btn" onclick="loadAnomalies()">Load anomalies</button>
-    <span id="train-status" style="font-size:12px;color:var(--muted)"></span>
-  </div>
-  <div style="display:flex;gap:10px;margin-bottom:16px">
-    <input id="ml-ip" placeholder="Score a specific IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-    <button class="btn" onclick="scoreIP()">Score IP</button>
-  </div>
-  <div id="score-panel" style="display:none" class="card">
-    <div class="ch"><span class="ct">IP Risk Score</span></div>
-    <div class="cb" id="score-body"></div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Detected anomalies — Isolation Forest + Baseline boost</span></div>
-    <table class="tbl">
-      <thead><tr><th>IP</th><th>Risk score</th><th>Anomaly score</th><th>Level</th><th></th></tr></thead>
-      <tbody id="anom-tbody"></tbody>
-    </table>
-  </div>
-</div>
-<div id="page-clusters" class="page">
-  <div style="margin-bottom:16px">
-    <button class="btn pri" onclick="loadClusters()">Analyse clusters</button>
-    <span style="font-size:12px;color:var(--muted);margin-left:12px">Finds coordinated groups by /24 subnet</span>
-  </div>
-  <div id="clusters-body"></div>
-</div>
-<div id="page-blocklist" class="page">
-  <div style="display:flex;gap:10px;margin-bottom:16px">
-    <input id="block-ip" placeholder="Manually block an IP…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/>
-    <button class="btn red" onclick="manualBlock()">Block</button>
-    <button class="btn" onclick="loadBlocklist()">↻ Refresh</button>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Active blocklist</span><span id="bl-count" style="font-size:11px;color:var(--muted)"></span></div>
-    <div class="cb" id="bl-body"></div>
-  </div>
-</div>
-<div id="page-ingest" class="page">
-  <div class="card" style="margin-bottom:16px">
-    <div class="ch"><span class="ct">Upload CSV log file</span></div>
-    <div class="cb">
-      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()" ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave()">
-        <h3 style="margin-bottom:8px">Drop CSV file here</h3>
-        <p style="color:var(--muted);font-size:12px">or click to browse</p>
-        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="uploadCSV(this.files[0])"/>
-      </div>
-      <div class="prog-wrap" id="prog-wrap"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>
-      <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Paste single JSON log</span></div>
-    <div class="cb">
-      <textarea id="json-log" rows="4" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;resize:vertical" placeholder='{"@timestamp":"2026-04-22T09:30:00Z","rule.description":"Fortigate: Login failed.","data.ui":"85.11.187.36","data.level":"alert"}'></textarea>
-      <button class="btn pri" style="margin-top:10px" onclick="ingestJSON()">Ingest</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Quick actions</span></div>
-    <div class="cb" style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn yel" onclick="buildAllBaselines()">Build all baselines</button>
-      <button class="btn pri" onclick="trainModelQuick()">Train ML model</button>
-      <span id="qa-status" style="font-size:12px;color:var(--muted);align-self:center"></span>
-    </div>
-  </div>
-</div>
-</main>
-</div>
-<div class="toast-wrap" id="toast-wrap"></div>
-<script>
-const API='/api', ML='/api/ml';
-let charts={}, curIP='';
 
-function nav(name){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  document.querySelectorAll('.ni').forEach(n=>{
-    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');
-  });
-  const T={overview:'Overview',trail:'IP Trail',livealerts:'Live Alerts',
-    deviations:'Baseline Deviations',bslexplorer:'Baseline Explorer',
-    ml:'ML Anomaly',clusters:'Subnet Clusters',blocklist:'Blocklist',ingest:'Ingest Logs'};
-  document.getElementById('page-title').textContent=T[name]||name;
-  if(name==='overview') refreshAll();
-  if(name==='livealerts') loadLiveAlerts();
-  if(name==='blocklist') loadBlocklist();
-  if(name==='clusters') loadClusters();
-  if(name==='ml') loadAnomalies();
-  if(name==='deviations') loadDeviations();
-}
-function toast(msg,type='ok'){
-  const w=document.getElementById('toast-wrap');
-  const el=document.createElement('div');
-  el.className='toast '+type; el.textContent=msg;
-  w.appendChild(el); setTimeout(()=>el.remove(),3500);
-}
-async function get(url){
-  try{const r=await fetch(url); if(!r.ok)throw new Error('HTTP '+r.status); return await r.json();}
-  catch(e){toast('API: '+e.message,'err'); return null;}
-}
-async function post(url,body=null){
-  try{
-    const opts={method:'POST'};
-    if(body){opts.headers={'Content-Type':'application/json'}; opts.body=JSON.stringify(body);}
-    const r=await fetch(url,opts); if(!r.ok)throw new Error('HTTP '+r.status); return await r.json();
-  }catch(e){toast('API: '+e.message,'err'); return null;}
-}
-async function postForm(url,fd){
-  try{const r=await fetch(url,{method:'POST',body:fd}); if(!r.ok)throw new Error('HTTP '+r.status); return await r.json();}
-  catch(e){toast('API: '+e.message,'err'); return null;}
-}
-async function del(url){
-  try{const r=await fetch(url,{method:'DELETE'}); return await r.json();}
-  catch(e){toast('API: '+e.message,'err'); return null;}
-}
-const COLORS=['#f85149','#e3b341','#58a6ff','#3fb950','#bc8cff','#f0883e','#39d353','#ffa657','#79c0ff','#d2a8ff'];
-function pie(id,counts){
-  const labels=Object.keys(counts), data=Object.values(counts);
-  if(charts[id])charts[id].destroy();
-  charts[id]=new Chart(document.getElementById(id).getContext('2d'),{
-    type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:COLORS.slice(0,labels.length),borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8b949e',font:{size:10},boxWidth:10,padding:8}}}}
-  });
-}
-function bar(id,labels,data,color='#58a6ff',horizontal=false){
-  if(charts[id])charts[id].destroy();
-  charts[id]=new Chart(document.getElementById(id).getContext('2d'),{
-    type:'bar',
-    data:{labels,datasets:[{data,backgroundColor:color,borderRadius:3}]},
-    options:{indexAxis:horizontal?'y':'x',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e',font:{size:10,family:'Courier New'}},grid:{color:'#21262d'}}}}
-  });
-}
-async function refreshAll(){
-  const s=await get(`${API}/stats`); if(!s)return;
-  document.getElementById('m-total').textContent=s.total_logs.toLocaleString();
-  document.getElementById('m-ips').textContent=s.unique_ips.toLocaleString();
-  document.getElementById('m-hot').textContent=(s.hot_ips||[]).length;
-  document.getElementById('m-balerts').textContent=s.total_alerts||0;
-  document.getElementById('m-crit').textContent=(s.critical_ips||[]).length;
-  document.getElementById('m-blocked').textContent=(s.blocklist||[]).length;
-  document.getElementById('last-ref').textContent='Refreshed '+new Date().toLocaleTimeString();
-  if(s.threat_counts&&Object.keys(s.threat_counts).length) pie('ch-threats',s.threat_counts);
-  if(s.alert_type_counts&&Object.keys(s.alert_type_counts).length) pie('ch-devtypes',s.alert_type_counts);
-  const hot=await get(`${API}/hot-ips`);
-  if(hot){
-    document.getElementById('hot-count').textContent=hot.length+' IPs';
-    document.getElementById('hot-tbody').innerHTML=hot.slice(0,30).map(h=>{
-      const tt=h.threat_types?Object.entries(h.threat_types).sort((a,b)=>b[1]-a[1])[0]:['?',0];
-      const sv=h.severities?Object.entries(h.severities).sort((a,b)=>b[1]-a[1])[0]:['low',0];
-      return `<tr onclick="goTrail('${h.ip}')" style="cursor:pointer">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>CyberSentinel SOC Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --warn: #e3b341;
+      --ok: #3fb950;
+      --purple: #bc8cff;
+      --ai: #f55036;
+      --mono: 'Courier New', monospace
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 100vh
+    }
+
+    .sidebar {
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column
+    }
+
+    .main {
+      overflow-y: auto
+    }
+
+    .logo {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .logo-title {
+      font-size: 16px;
+      font-weight: 700
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px
+    }
+
+    .nav {
+      padding: 12px 0;
+      flex: 1
+    }
+
+    .ns {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 8px 20px 4px
+    }
+
+    .ni {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      border-left: 2px solid transparent
+    }
+
+    .ni:hover {
+      background: var(--bg3);
+      color: var(--text)
+    }
+
+    .ni.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(88, 166, 255, .06)
+    }
+
+    .ndot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0
+    }
+
+    .nd-r {
+      background: var(--danger)
+    }
+
+    .nd-w {
+      background: var(--warn)
+    }
+
+    .nd-g {
+      background: var(--ok)
+    }
+
+    .nd-p {
+      background: var(--purple)
+    }
+
+    .sfooter {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border)
+    }
+
+    .srow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px
+    }
+
+    .pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+      animation: pulse 2s infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      position: sticky;
+      top: 0;
+      z-index: 10
+    }
+
+    .topbar h1 {
+      font-size: 16px;
+      font-weight: 600;
+      flex: 1
+    }
+
+    .srch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      flex: 1;
+      max-width: 300px
+    }
+
+    .srch input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 13px;
+      flex: 1
+    }
+
+    .srch input::placeholder {
+      color: var(--muted)
+    }
+
+    .btn {
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer
+    }
+
+    .btn:hover {
+      background: var(--border)
+    }
+
+    .btn.pri {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      font-weight: 600
+    }
+
+    .btn.red {
+      background: var(--danger);
+      color: #fff;
+      border-color: var(--danger)
+    }
+
+    .btn.yel {
+      background: var(--warn);
+      color: #000;
+      border-color: var(--warn)
+    }
+
+    .btn.ai {
+      background: var(--ai);
+      color: #fff;
+      border-color: var(--ai);
+      font-weight: 600
+    }
+
+    .btn:disabled {
+      opacity: .45;
+      cursor: not-allowed
+    }
+
+    .page {
+      display: none;
+      padding: 24px
+    }
+
+    .page.active {
+      display: block
+    }
+
+    .mg {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px
+    }
+
+    .metric {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px
+    }
+
+    .mlabel {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px
+    }
+
+    .mval {
+      font-size: 28px;
+      font-weight: 700
+    }
+
+    .mv-a {
+      color: var(--accent)
+    }
+
+    .mv-d {
+      color: var(--danger)
+    }
+
+    .mv-w {
+      color: var(--warn)
+    }
+
+    .mv-g {
+      color: var(--ok)
+    }
+
+    .mv-p {
+      color: var(--purple)
+    }
+
+    .msub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 16px
+    }
+
+    .ch {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .ct {
+      font-size: 13px;
+      font-weight: 600
+    }
+
+    .cb {
+      padding: 16px
+    }
+
+    .tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px
+    }
+
+    .tbl th {
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: uppercase
+    }
+
+    .tbl td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(48, 54, 61, .5);
+      font-family: var(--mono)
+    }
+
+    .tbl tr:hover td {
+      background: var(--bg3)
+    }
+
+    .tbl tr:last-child td {
+      border-bottom: none
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 12px;
+      text-transform: uppercase
+    }
+
+    .badge.critical {
+      background: rgba(248, 81, 73, .18);
+      color: #f85149
+    }
+
+    .badge.high {
+      background: rgba(227, 179, 65, .18);
+      color: #e3b341
+    }
+
+    .badge.medium {
+      background: rgba(88, 166, 255, .18);
+      color: #58a6ff
+    }
+
+    .badge.low {
+      background: rgba(63, 185, 80, .18);
+      color: #3fb950
+    }
+
+    .badge.blocked {
+      background: rgba(188, 140, 255, .18);
+      color: #bc8cff
+    }
+
+    .cg2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px
+    }
+
+    .cg3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px
+    }
+
+    .cbox {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px
+    }
+
+    .cbox h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em
+    }
+
+    .cwrap {
+      position: relative;
+      height: 200px
+    }
+
+    .tlist {
+      max-height: 460px;
+      overflow-y: auto
+    }
+
+    .ti {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(48, 54, 61, .4)
+    }
+
+    .ti:last-child {
+      border-bottom: none
+    }
+
+    .tdot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px
+    }
+
+    .tdot.critical {
+      background: var(--danger)
+    }
+
+    .tdot.high {
+      background: var(--warn)
+    }
+
+    .tdot.medium {
+      background: var(--accent)
+    }
+
+    .tdot.low {
+      background: var(--ok)
+    }
+
+    .tts {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 140px;
+      flex-shrink: 0
+    }
+
+    .tdesc {
+      font-size: 12px;
+      color: var(--muted);
+      flex: 1;
+      line-height: 1.5
+    }
+
+    .tdesc b {
+      color: var(--text);
+      font-weight: 500
+    }
+
+    .ip-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px
+    }
+
+    .ip-hdr {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px
+    }
+
+    .ip-big {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 700
+    }
+
+    .ip-mg {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px
+    }
+
+    .ipm {
+      background: var(--bg3);
+      border-radius: 6px;
+      padding: 10px
+    }
+
+    .ipm-l {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 4px
+    }
+
+    .ipm-v {
+      font-size: 15px;
+      font-weight: 600
+    }
+
+    .dev-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(48, 54, 61, .4)
+    }
+
+    .dev-row:last-child {
+      border-bottom: none
+    }
+
+    .dev-ip {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      min-width: 130px;
+      flex-shrink: 0;
+      cursor: pointer
+    }
+
+    .dev-type {
+      font-size: 11px;
+      font-family: var(--mono);
+      min-width: 180px;
+      flex-shrink: 0
+    }
+
+    .dev-msg {
+      font-size: 12px;
+      color: var(--muted);
+      flex: 1;
+      line-height: 1.4
+    }
+
+    .dev-ts {
+      font-size: 10px;
+      color: var(--muted);
+      min-width: 65px;
+      text-align: right
+    }
+
+    .bsl-stat {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px
+    }
+
+    .bsl-box {
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center
+    }
+
+    .bsl-box-val {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px
+    }
+
+    .bsl-box-lbl {
+      font-size: 11px;
+      color: var(--muted)
+    }
+
+    .bsl-section {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin: .75rem 0 .4rem
+    }
+
+    .bsl-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap
+    }
+
+    .bsl-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      background: rgba(88, 166, 255, .12);
+      color: var(--accent)
+    }
+
+    .bsl-tag.warn {
+      background: rgba(227, 179, 65, .12);
+      color: var(--warn)
+    }
+
+    .bsl-tag.ok {
+      background: rgba(63, 185, 80, .12);
+      color: var(--ok)
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag {
+      border-color: var(--accent)
+    }
+
+    .prog-wrap {
+      background: var(--bg3);
+      border-radius: 4px;
+      height: 6px;
+      margin-top: 12px;
+      overflow: hidden;
+      display: none
+    }
+
+    .prog-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width .3s
+    }
+
+    .toast-wrap {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .toast {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 12px;
+      animation: slideIn .2s ease;
+      max-width: 300px
+    }
+
+    .toast.ok {
+      border-left: 3px solid var(--ok)
+    }
+
+    .toast.err {
+      border-left: 3px solid var(--danger)
+    }
+
+    .toast.warn {
+      border-left: 3px solid var(--warn)
+    }
+
+    .toast.ai {
+      border-left: 3px solid var(--ai)
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(40px);
+        opacity: 0
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1
+      }
+    }
+
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .alert-card {
+      background: var(--bg3);
+      border-radius: 8px;
+      margin: 8px 16px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--border)
+    }
+
+    .alert-card.critical {
+      border-left-color: var(--danger)
+    }
+
+    .alert-card.high {
+      border-left-color: var(--warn)
+    }
+
+    .alert-card.medium {
+      border-left-color: var(--accent)
+    }
+
+    .alert-card.low {
+      border-left-color: var(--ok)
+    }
+
+    .alert-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      flex-wrap: wrap
+    }
+
+    .alert-type-label {
+      font-size: 12px;
+      font-weight: 700;
+      font-family: var(--mono)
+    }
+
+    .alert-ip-label {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      margin-right: auto
+    }
+
+    .alert-time {
+      font-size: 10px;
+      color: var(--muted)
+    }
+
+    .alert-message {
+      font-size: 12px;
+      color: var(--text);
+      margin-bottom: 6px;
+      line-height: 1.5
+    }
+
+    .alert-why {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+      background: var(--bg2);
+      border-radius: 5px;
+      padding: 7px 10px;
+      margin-bottom: 6px;
+      border: .5px solid var(--border)
+    }
+
+    .alert-why b {
+      color: var(--warn)
+    }
+
+    .alert-action {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 0
+    }
+
+    .alert-action.critical {
+      color: var(--danger)
+    }
+
+    .alert-action.high {
+      color: var(--warn)
+    }
+
+    .alert-action.medium {
+      color: var(--accent)
+    }
+
+    .alert-action.low {
+      color: var(--ok)
+    }
+
+    .alert-details {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 5px
+    }
+
+    .alert-detail-chip {
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 1px 7px;
+      border-radius: 4px;
+      background: var(--bg2);
+      color: var(--muted);
+      border: .5px solid var(--border)
+    }
+
+    .ml-explain {
+      margin-top: 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 13px 14px
+    }
+
+    .ml-explain-title {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 7px;
+      color: var(--text)
+    }
+
+    .ml-explain p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 8px
+    }
+
+    .ml-driver-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 8px;
+      margin-top: 10px
+    }
+
+    .ml-driver {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--muted)
+    }
+
+    .ml-driver b {
+      color: var(--text)
+    }
+
+    .ml-driver.critical {
+      border-left: 3px solid var(--danger)
+    }
+
+    .ml-driver.high {
+      border-left: 3px solid var(--warn)
+    }
+
+    .ml-driver.medium {
+      border-left: 3px solid var(--accent)
+    }
+
+    .ml-formula {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg2);
+      border-radius: 5px;
+      padding: 7px 9px;
+      border: 1px solid var(--border)
+    }
+
+    .ai-panel {
+      background: linear-gradient(135deg, rgba(245, 80, 54, .08), rgba(245, 80, 54, .02));
+      border: 1px solid rgba(245, 80, 54, .3);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px
+    }
+
+    .ai-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap
+    }
+
+    .ai-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--ai);
+      color: #fff;
+      letter-spacing: .04em
+    }
+
+    .ai-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text)
+    }
+
+    .ai-model {
+      font-size: 10px;
+      color: var(--muted)
+    }
+
+    .ai-body {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.75
+    }
+
+    .ai-body p {
+      margin-bottom: 10px
+    }
+
+    .ai-section {
+      display: block;
+      font-weight: 700;
+      color: var(--ai);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin: 8px 0 3px
+    }
+
+    .ai-loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .ai-spin {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--ai);
+      border-radius: 50%;
+      animation: spin .8s linear infinite
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .ai-inline {
+      margin-top: 8px;
+      background: rgba(245, 80, 54, .06);
+      border: 1px solid rgba(245, 80, 54, .2);
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6
+    }
+
+    .term-panel {
+      background: rgba(88, 166, 255, .06);
+      border: 1px solid rgba(88, 166, 255, .22);
+      border-radius: 8px;
+      padding: 13px 15px;
+      margin-bottom: 16px
+    }
+
+    .term-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px
+    }
+
+    .term-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 8px
+    }
+
+    .term {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+      background: rgba(13, 17, 23, .45);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px
+    }
+
+    .term b {
+      color: var(--accent)
+    }
+
+    .ip-chip {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(248, 81, 73, .12);
+      color: var(--danger);
+      margin: 2px;
+      cursor: pointer
+    }
+
+    .ip-chip:hover {
+      background: rgba(248, 81, 73, .25)
+    }
+
+    /* Command-center visual upgrade */
+    :root {
+      --bg: #05070c;
+      --bg2: #0b1118;
+      --bg3: #121a24;
+      --border: #243241;
+      --text: #eef6ff;
+      --muted: #93a4b7;
+      --accent: #49b6ff;
+      --danger: #ff4d5e;
+      --warn: #ffbf47;
+      --ok: #37d67a;
+      --purple: #a989ff;
+      --ai: #ff6a3d;
+      --panel: rgba(13, 20, 29, .86);
+      --panel2: rgba(18, 27, 38, .9);
+      --line: rgba(96, 125, 153, .28)
+    }
+
+    body {
+      background: linear-gradient(145deg, #05070c 0%, #08111a 44%, #0d151d 100%);
+      color: var(--text);
+      font-size: 14px;
+      min-height: 100vh
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(rgba(73, 182, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(73, 182, 255, .025) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .75), rgba(0, 0, 0, .2));
+      z-index: -1
+    }
+
+    .shell {
+      grid-template-columns: 248px minmax(0, 1fr)
+    }
+
+    .sidebar {
+      background: linear-gradient(180deg, rgba(9, 15, 23, .98), rgba(10, 17, 25, .94));
+      box-shadow: 18px 0 45px rgba(0, 0, 0, .32);
+      position: relative
+    }
+
+    .sidebar::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+      opacity: .5
+    }
+
+    .logo {
+      padding: 22px 22px 18px;
+      background: linear-gradient(180deg, rgba(73, 182, 255, .08), transparent)
+    }
+
+    .logo-title {
+      font-size: 18px;
+      letter-spacing: .04em
+    }
+
+    .logo-title::before {
+      content: "";
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 18px rgba(73, 182, 255, .8);
+      margin-right: 9px
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em
+    }
+
+    .nav {
+      padding: 14px 10px
+    }
+
+    .ns {
+      padding: 14px 14px 7px;
+      color: #64768a;
+      letter-spacing: .14em
+    }
+
+    .ni {
+      margin: 3px 0;
+      padding: 10px 12px 10px 14px;
+      border-left: 0;
+      border-radius: 7px;
+      color: #aab7c5;
+      position: relative
+    }
+
+    .ni:hover {
+      background: rgba(73, 182, 255, .08);
+      color: var(--text);
+      transform: translateX(2px)
+    }
+
+    .ni.active {
+      background: linear-gradient(90deg, rgba(73, 182, 255, .2), rgba(73, 182, 255, .04));
+      color: var(--text);
+      box-shadow: inset 3px 0 0 var(--accent)
+    }
+
+    .ndot {
+      box-shadow: 0 0 14px currentColor
+    }
+
+    .sfooter {
+      padding: 15px 18px;
+      background: rgba(3, 8, 13, .35)
+    }
+
+    .srow {
+      justify-content: space-between;
+      font-size: 11px
+    }
+
+    .pulse {
+      box-shadow: 0 0 14px rgba(55, 214, 122, .7)
+    }
+
+    .topbar {
+      min-height: 68px;
+      padding: 14px 26px;
+      background: rgba(7, 12, 18, .86);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, .28)
+    }
+
+    .topbar h1 {
+      font-size: 18px;
+      letter-spacing: .02em
+    }
+
+    .srch {
+      background: rgba(18, 27, 38, .86);
+      border-color: rgba(73, 182, 255, .24);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .02);
+      min-height: 38px
+    }
+
+    .srch:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(73, 182, 255, .12)
+    }
+
+    .btn {
+      border-color: rgba(126, 153, 180, .24);
+      background: linear-gradient(180deg, rgba(28, 41, 55, .96), rgba(16, 25, 35, .96));
+      box-shadow: 0 8px 18px rgba(0, 0, 0, .22);
+      font-weight: 650;
+      letter-spacing: .01em
+    }
+
+    .btn:hover {
+      background: linear-gradient(180deg, rgba(40, 56, 73, .98), rgba(20, 31, 43, .98));
+      border-color: rgba(126, 153, 180, .44);
+      transform: translateY(-1px)
+    }
+
+    .btn.pri {
+      background: linear-gradient(135deg, #63c5ff, #3da0ff);
+      border-color: #70c9ff;
+      color: #04101a
+    }
+
+    .btn.red {
+      background: linear-gradient(135deg, #ff5b68, #d93649);
+      border-color: #ff7b86
+    }
+
+    .btn.yel {
+      background: linear-gradient(135deg, #ffd166, #e6a72f);
+      border-color: #ffd166;
+      color: #140e03
+    }
+
+    .btn.ai {
+      background: linear-gradient(135deg, #ff835f, #f04d2d);
+      border-color: #ff9a7b
+    }
+
+    .page {
+      padding: 26px;
+      max-width: 1540px
+    }
+
+    .ops-hero {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.15fr) repeat(3, minmax(160px, .55fr));
+      gap: 14px;
+      margin-bottom: 14px
+    }
+
+    .ops-main {
+      background: linear-gradient(135deg, rgba(73, 182, 255, .16), rgba(55, 214, 122, .08));
+      border: 1px solid rgba(73, 182, 255, .28);
+      border-radius: 8px;
+      padding: 18px 20px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .3);
+      position: relative;
+      overflow: hidden
+    }
+
+    .ops-main::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--ok), var(--warn), var(--danger), var(--accent))
+    }
+
+    .ops-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      color: #9db1c5;
+      margin-bottom: 8px
+    }
+
+    .ops-title {
+      font-size: 32px;
+      font-weight: 850;
+      line-height: 1.04;
+      max-width: 720px
+    }
+
+    .ops-copy {
+      font-size: 12px;
+      color: #b5c3d2;
+      margin-top: 8px;
+      max-width: 640px;
+      line-height: 1.5
+    }
+
+    .ops-chip {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, .24)
+    }
+
+    .ops-chip-l {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--muted);
+      margin-bottom: 7px
+    }
+
+    .ops-chip-v {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: var(--mono)
+    }
+
+    .ops-chip-s {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px
+    }
+
+    .situation-board {
+      display: grid;
+      grid-template-columns: 260px minmax(320px, 1fr) minmax(320px, .9fr);
+      gap: 14px;
+      margin-bottom: 18px
+    }
+
+    .threat-dial,
+    .signal-matrix,
+    .response-queue {
+      background: linear-gradient(180deg, rgba(15, 25, 36, .92), rgba(7, 12, 18, .94));
+      border: 1px solid rgba(94, 118, 142, .24);
+      border-radius: 8px;
+      box-shadow: 0 22px 52px rgba(0, 0, 0, .3);
+      position: relative;
+      overflow: hidden
+    }
+
+    .threat-dial::before,
+    .signal-matrix::before,
+    .response-queue::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(73, 182, 255, .65), transparent)
+    }
+
+    .threat-dial {
+      padding: 17px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 236px
+    }
+
+    .dial-ring {
+      --risk: 0;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--danger) calc(var(--risk) * 1%), rgba(73, 182, 255, .16) 0);
+      box-shadow: 0 0 42px rgba(73, 182, 255, .14), inset 0 0 28px rgba(0, 0, 0, .38);
+      position: relative
+    }
+
+    .dial-ring::before {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 36%, rgba(73, 182, 255, .12), rgba(5, 7, 12, .96) 62%);
+      border: 1px solid rgba(126, 153, 180, .25)
+    }
+
+    .dial-core {
+      position: relative;
+      text-align: center
+    }
+
+    .dial-core span {
+      display: block;
+      font-family: var(--mono);
+      font-size: 42px;
+      font-weight: 900;
+      line-height: .95
+    }
+
+    .dial-core small {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .14em
+    }
+
+    .dial-caption {
+      font-size: 12px;
+      color: #b9c8d8;
+      text-align: center;
+      line-height: 1.45;
+      margin-top: 14px;
+      max-width: 220px
+    }
+
+    .dial-meta {
+      display: flex;
+      gap: 8px;
+      margin-top: 13px;
+      flex-wrap: wrap;
+      justify-content: center
+    }
+
+    .dial-pill {
+      font-size: 10px;
+      font-family: var(--mono);
+      border: 1px solid rgba(126, 153, 180, .22);
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: rgba(73, 182, 255, .06);
+      color: #9fb4c9
+    }
+
+    .signal-matrix {
+      padding: 16px 17px
+    }
+
+    .matrix-head,
+    .queue-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 13px
+    }
+
+    .matrix-title,
+    .queue-title {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: #d7e7f7
+    }
+
+    .matrix-state,
+    .queue-state {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: var(--mono)
+    }
+
+    .signal-row {
+      display: grid;
+      grid-template-columns: 116px 1fr 54px;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(94, 118, 142, .14)
+    }
+
+    .signal-row:last-child {
+      border-bottom: none
+    }
+
+    .signal-name {
+      font-size: 11px;
+      color: #a9bad0;
+      text-transform: uppercase;
+      letter-spacing: .08em
+    }
+
+    .sig-track {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(126, 153, 180, .14);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03)
+    }
+
+    .sig-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--ok), var(--accent));
+      transition: width .35s ease
+    }
+
+    .sig-fill.warn {
+      background: linear-gradient(90deg, var(--warn), #ff7b45)
+    }
+
+    .sig-fill.danger {
+      background: linear-gradient(90deg, var(--danger), #ff884d)
+    }
+
+    .sig-value {
+      font-size: 15px;
+      font-weight: 850;
+      font-family: var(--mono);
+      text-align: right
+    }
+
+    .response-queue {
+      padding: 16px 17px
+    }
+
+    .watchlist {
+      display: grid;
+      gap: 8px
+    }
+
+    .watch-item {
+      display: grid;
+      grid-template-columns: minmax(112px, .8fr) minmax(0, 1fr) 54px;
+      align-items: center;
+      gap: 10px;
+      background: rgba(7, 12, 18, .55);
+      border: 1px solid rgba(94, 118, 142, .18);
+      border-radius: 7px;
+      padding: 9px 10px;
+      cursor: pointer
+    }
+
+    .watch-item:hover {
+      border-color: rgba(73, 182, 255, .42);
+      background: rgba(73, 182, 255, .07)
+    }
+
+    .watch-ip {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent)
+    }
+
+    .watch-meta {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .watch-score {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 850;
+      text-align: right
+    }
+
+    .watch-score.critical {
+      color: var(--danger)
+    }
+
+    .watch-score.high {
+      color: var(--warn)
+    }
+
+    .watch-score.medium {
+      color: var(--accent)
+    }
+
+    .watch-score.low {
+      color: var(--ok)
+    }
+
+    .ops-tape {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px
+    }
+
+    .ops-tape span {
+      font-size: 10px;
+      font-family: var(--mono);
+      color: #bfd0df;
+      background: rgba(5, 7, 12, .42);
+      border: 1px solid rgba(126, 153, 180, .18);
+      border-radius: 999px;
+      padding: 4px 8px
+    }
+
+    .mg {
+      grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px
+    }
+
+    .metric {
+      background: linear-gradient(180deg, rgba(19, 30, 42, .92), rgba(10, 16, 24, .92));
+      border-color: rgba(102, 130, 158, .24);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, .26);
+      position: relative;
+      overflow: hidden
+    }
+
+    .metric::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent)
+    }
+
+    .metric:nth-child(3)::before,
+    .metric:nth-child(4)::before,
+    .metric:nth-child(5)::before {
+      background: linear-gradient(90deg, var(--danger), transparent)
+    }
+
+    .metric:nth-child(6)::before {
+      background: linear-gradient(90deg, var(--warn), transparent)
+    }
+
+    .metric:hover {
+      transform: translateY(-2px);
+      border-color: rgba(73, 182, 255, .36)
+    }
+
+    .mlabel {
+      letter-spacing: .11em;
+      color: #8fa1b4
+    }
+
+    .mval {
+      font-size: 34px;
+      line-height: 1;
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums
+    }
+
+    .card,
+    .cbox,
+    .ip-panel,
+    .term-panel,
+    .ai-panel {
+      background: var(--panel);
+      border-color: var(--line);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, .24)
+    }
+
+    .card,
+    .cbox,
+    .ip-panel,
+    .term-panel,
+    .ai-panel,
+    .metric,
+    .ops-main,
+    .ops-chip {
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease
+    }
+
+    .ch {
+      background: linear-gradient(180deg, rgba(255, 255, 255, .035), transparent);
+      padding: 15px 18px
+    }
+
+    .ct,
+    .cbox h3,
+    .term-title {
+      letter-spacing: .04em
+    }
+
+    .tbl {
+      border-collapse: separate;
+      border-spacing: 0
+    }
+
+    .tbl th {
+      background: rgba(5, 9, 14, .68);
+      position: sticky;
+      top: 0;
+      z-index: 1
+    }
+
+    .tbl td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(66, 86, 105, .28)
+    }
+
+    .tbl tr:hover td {
+      background: rgba(73, 182, 255, .07)
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 3px 8px;
+      letter-spacing: .05em;
+      border: 1px solid currentColor
+    }
+
+    .ipm,
+    .bsl-box,
+    .term,
+    .ml-driver {
+      background: rgba(7, 12, 18, .58);
+      border: 1px solid rgba(94, 118, 142, .18)
+    }
+
+    .alert-card {
+      background: linear-gradient(180deg, rgba(20, 29, 40, .92), rgba(11, 17, 25, .92));
+      border: 1px solid rgba(94, 118, 142, .22);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, .22)
+    }
+
+    .alert-card.critical {
+      box-shadow: inset 4px 0 0 var(--danger), 0 14px 30px rgba(0, 0, 0, .22)
+    }
+
+    .alert-card.high {
+      box-shadow: inset 4px 0 0 var(--warn), 0 14px 30px rgba(0, 0, 0, .22)
+    }
+
+    .alert-card.medium {
+      box-shadow: inset 4px 0 0 var(--accent), 0 14px 30px rgba(0, 0, 0, .22)
+    }
+
+    .alert-card.low {
+      box-shadow: inset 4px 0 0 var(--ok), 0 14px 30px rgba(0, 0, 0, .22)
+    }
+
+    .alert-card.critical,
+    .alert-card.high,
+    .alert-card.medium,
+    .alert-card.low {
+      border-left: 1px solid rgba(94, 118, 142, .22)
+    }
+
+    .upload-zone {
+      background: linear-gradient(135deg, rgba(73, 182, 255, .08), rgba(55, 214, 122, .04));
+      border-color: rgba(73, 182, 255, .28)
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag {
+      background: linear-gradient(135deg, rgba(73, 182, 255, .14), rgba(55, 214, 122, .08));
+      box-shadow: 0 18px 40px rgba(0, 0, 0, .24)
+    }
+
+    input,
+    textarea {
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .02)
+    }
+
+    .ip-chip {
+      border: 1px solid rgba(255, 77, 94, .28);
+      border-radius: 999px;
+      padding: 4px 9px
+    }
+
+    @media(max-width:1180px) {
+      .situation-board {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .response-queue {
+        grid-column: 1/-1
+      }
+
+      .ops-hero {
+        grid-template-columns: 1fr 1fr
+      }
+    }
+
+    @media(max-width:980px) {
+      .shell {
+        grid-template-columns: 1fr
+      }
+
+      .sidebar {
+        position: relative
+      }
+
+      .nav {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 4px
+      }
+
+      .ns {
+        grid-column: 1/-1
+      }
+
+      .ops-hero,
+      .situation-board {
+        grid-template-columns: 1fr
+      }
+
+      .topbar {
+        position: relative;
+        flex-wrap: wrap
+      }
+
+      .srch {
+        max-width: none
+      }
+
+      .page {
+        padding: 18px
+      }
+
+      .ip-mg,
+      .cg2,
+      .bsl-stat {
+        grid-template-columns: 1fr
+      }
+
+      .signal-row {
+        grid-template-columns: 100px 1fr 46px
+      }
+
+      .watch-item {
+        grid-template-columns: 1fr 48px
+      }
+
+      .watch-meta {
+        grid-column: 1/-1;
+        grid-row: 2
+      }
+
+      .ops-title {
+        font-size: 26px
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="enhance.css">
+</head>
+
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-title">CyberSentinel</div>
+        <div class="logo-sub">SOC Operations Console</div>
+      </div>
+      <nav class="nav">
+        <div class="ns">Monitor</div>
+        <div class="ni active" onclick="nav('overview')"><span class="ndot nd-r"></span>Overview</div>
+        <div class="ni" onclick="nav('trail')"><span class="ndot nd-w"></span>IP Trail</div>
+        <div class="ni" onclick="nav('livealerts')"><span class="ndot nd-r"></span>Live Alerts</div>
+        <div class="ns">Baselines</div>
+        <div class="ni" onclick="nav('deviations')"><span class="ndot nd-r"></span>Deviations</div>
+        <div class="ni" onclick="nav('bslexplorer')"><span class="ndot nd-w"></span>Baseline Explorer</div>
+        <div class="ns">AI Analysis</div>
+        <div class="ni" onclick="nav('aiinvestigate')"><span class="ndot" style="background:var(--ai)"></span>AI
+          Investigator</div>
+        <div class="ns">Detection</div>
+        <div class="ni" onclick="nav('ml')"><span class="ndot nd-g"></span>ML Anomaly</div>
+        <div class="ni" onclick="nav('clusters')"><span class="ndot nd-w"></span>Subnet Clusters</div>
+        <div class="ns">Control</div>
+        <div class="ni" onclick="nav('blocklist')"><span class="ndot nd-r"></span>Blocklist</div>
+        <div class="ni" onclick="nav('ingest')"><span class="ndot nd-g"></span>Ingest Logs</div>
+      </nav>
+      <div class="sfooter">
+        <div class="srow"><span class="pulse"></span>Backend API</div>
+        <div class="srow" id="ml-status"><span
+            style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> ML
+          Engine</div>
+        <div class="srow" id="ai-status"><span
+            style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> AI
+          Engine</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px" id="last-ref">—</div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <h1 id="page-title">Overview</h1>
+        <div class="srch">
+          <svg width="13" height="13" fill="none" stroke="var(--muted)" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" stroke-linecap="round" />
+          </svg>
+          <input id="ip-search" placeholder="Search IP…" onkeydown="if(event.key==='Enter')doSearch()" />
+        </div>
+        <button class="btn" onclick="doSearch()">Search</button>
+        <button class="btn pri" onclick="refreshAll()">↻ Refresh</button>
+      </div>
+      <div id="page-overview" class="page active">
+        <section class="ops-hero">
+          <div class="ops-main">
+            <div class="ops-kicker">Security Command Center</div>
+            <div class="ops-title" id="ops-posture">Analysing live posture</div>
+            <div class="ops-copy" id="ops-copy">Ingested events, behavioural baselines, anomaly scores, and analyst
+              controls are synced into one operational view.</div>
+            <div class="ops-tape">
+              <span>LIVE REDIS TELEMETRY</span>
+              <span>BASELINE ENGINE ONLINE</span>
+              <span>ML SIGNALS INDEXED</span>
+              <span>AI EXPLAIN READY</span>
+            </div>
+          </div>
+          <div class="ops-chip">
+            <div class="ops-chip-l">Event Volume</div>
+            <div class="ops-chip-v mv-a" id="ops-total">—</div>
+            <div class="ops-chip-s">logs retained</div>
+          </div>
+          <div class="ops-chip">
+            <div class="ops-chip-l">Critical Signals</div>
+            <div class="ops-chip-v mv-d" id="ops-critical">—</div>
+            <div class="ops-chip-s">IPs requiring attention</div>
+          </div>
+          <div class="ops-chip">
+            <div class="ops-chip-l">Controls Active</div>
+            <div class="ops-chip-v mv-w" id="ops-blocked">—</div>
+            <div class="ops-chip-s">blocked indicators</div>
+          </div>
+        </section>
+        <section class="situation-board">
+          <div class="threat-dial">
+            <div class="dial-ring" id="threat-dial" style="--risk:0">
+              <div class="dial-core">
+                <span id="threat-index">0</span>
+                <small>Threat Index</small>
+              </div>
+            </div>
+            <div class="dial-caption" id="threat-caption">Waiting for live telemetry.</div>
+            <div class="dial-meta">
+              <span class="dial-pill" id="dial-hot">HOT 0</span>
+              <span class="dial-pill" id="dial-alerts">ALERTS 0</span>
+            </div>
+          </div>
+          <div class="signal-matrix">
+            <div class="matrix-head">
+              <div class="matrix-title">Signal Strength</div>
+              <div class="matrix-state" id="matrix-state">SYNCING</div>
+            </div>
+            <div class="signal-row">
+              <div class="signal-name">Hot IPs</div>
+              <div class="sig-track">
+                <div class="sig-fill danger" id="sig-hot"></div>
+              </div>
+              <div class="sig-value" id="sig-hot-v">0</div>
+            </div>
+            <div class="signal-row">
+              <div class="signal-name">Critical</div>
+              <div class="sig-track">
+                <div class="sig-fill danger" id="sig-critical"></div>
+              </div>
+              <div class="sig-value" id="sig-critical-v">0</div>
+            </div>
+            <div class="signal-row">
+              <div class="signal-name">Deviations</div>
+              <div class="sig-track">
+                <div class="sig-fill warn" id="sig-alerts"></div>
+              </div>
+              <div class="sig-value" id="sig-alerts-v">0</div>
+            </div>
+            <div class="signal-row">
+              <div class="signal-name">Blocked</div>
+              <div class="sig-track">
+                <div class="sig-fill" id="sig-blocked"></div>
+              </div>
+              <div class="sig-value" id="sig-blocked-v">0</div>
+            </div>
+            <div class="signal-row">
+              <div class="signal-name">Coverage</div>
+              <div class="sig-track">
+                <div class="sig-fill" id="sig-coverage"></div>
+              </div>
+              <div class="sig-value" id="sig-coverage-v">0%</div>
+            </div>
+          </div>
+          <div class="response-queue">
+            <div class="queue-head">
+              <div class="queue-title">Response Queue</div>
+              <div class="queue-state">TOP ACTIVE SOURCES</div>
+            </div>
+            <div class="watchlist" id="watchlist">
+              <div class="empty" style="padding:18px">Waiting for hot IP telemetry</div>
+            </div>
+          </div>
+        </section>
+        <div class="mg">
+          <div class="metric">
+            <div class="mlabel">Total logs</div>
+            <div class="mval mv-a" id="m-total">—</div>
+            <div class="msub">ingested</div>
+          </div>
+          <div class="metric">
+            <div class="mlabel">Unique IPs</div>
+            <div class="mval mv-a" id="m-ips">—</div>
+            <div class="msub">tracked</div>
+          </div>
+          <div class="metric">
+            <div class="mlabel">Hot IPs</div>
+            <div class="mval mv-d" id="m-hot">—</div>
+            <div class="msub">high/critical</div>
+          </div>
+          <div class="metric">
+            <div class="mlabel">Baseline alerts</div>
+            <div class="mval mv-d" id="m-balerts">—</div>
+            <div class="msub">deviations fired</div>
+          </div>
+          <div class="metric">
+            <div class="mlabel">Critical IPs</div>
+            <div class="mval mv-d" id="m-crit">—</div>
+            <div class="msub">P0 flagged</div>
+          </div>
+          <div class="metric">
+            <div class="mlabel">Auto-blocked</div>
+            <div class="mval mv-w" id="m-blocked">—</div>
+            <div class="msub">bad subnets</div>
+          </div>
+        </div>
+        <div class="cg2">
+          <div class="cbox">
+            <h3>Threat types</h3>
+            <div class="cwrap"><canvas id="ch-threats"></canvas></div>
+          </div>
+          <div class="cbox">
+            <h3>Baseline deviation types</h3>
+            <div class="cwrap"><canvas id="ch-devtypes"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Hot IPs</span><span id="hot-count"
+              style="font-size:11px;color:var(--muted)"></span></div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>IP</th>
+                <th>Events</th>
+                <th>First seen</th>
+                <th>Last seen</th>
+                <th>Top threat</th>
+                <th>Severity</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="hot-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="page-trail" class="page">
+        <div class="card" style="margin-bottom:16px">
+          <div class="cb" style="display:flex;gap:10px">
+            <input id="trail-input" placeholder="Enter IP (e.g. 85.11.187.36)"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
+            <button class="btn pri" onclick="loadTrail()">Load trail</button>
+            <button class="btn" onclick="loadIntel()">+ Intel</button>
+            <button class="btn yel" onclick="loadBaseline()">Baseline</button>
+            <button class="btn ai" onclick="aiExplainIP()">AI analysis</button>
+            <button class="btn red" onclick="blockCurrent()">Block IP</button>
+          </div>
+        </div>
+        <div id="trail-panel" style="display:none">
+          <div class="ip-panel">
+            <div class="ip-hdr">
+              <div class="ip-big" id="t-ip">—</div>
+              <span class="badge" id="t-sev-badge">—</span>
+              <span id="t-blocked-badge" style="display:none" class="badge blocked">Blocked</span>
+            </div>
+            <div class="ip-mg">
+              <div class="ipm">
+                <div class="ipm-l">Total events</div>
+                <div class="ipm-v mv-a" id="t-total">—</div>
+              </div>
+              <div class="ipm">
+                <div class="ipm-l">First seen</div>
+                <div class="ipm-v" style="font-size:11px;font-family:var(--mono)" id="t-first">—</div>
+              </div>
+              <div class="ipm">
+                <div class="ipm-l">Last seen</div>
+                <div class="ipm-v" style="font-size:11px;font-family:var(--mono)" id="t-last">—</div>
+              </div>
+              <div class="ipm">
+                <div class="ipm-l">Top threat</div>
+                <div class="ipm-v" id="t-threat">—</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap" id="t-badges"></div>
+          </div>
+          <div id="ai-trail-panel" style="display:none" class="ai-panel">
+            <div class="ai-header">
+              <span class="ai-badge">AI</span>
+              <span class="ai-title" id="ai-trail-title">AI Analysis</span>
+              <span class="ai-model" id="ai-trail-model"></span>
+            </div>
+            <div id="ai-trail-body" class="ai-body"></div>
+          </div>
+          <div id="intel-panel" style="display:none" class="card">
+            <div class="ch"><span class="ct">Threat Intel</span></div>
+            <div class="cb" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
+          </div>
+          <div id="bsl-panel" style="display:none" class="card">
+            <div class="ch"><span class="ct">Baseline Profile</span><span id="bsl-alert-count"
+                style="font-size:11px;color:var(--danger)"></span></div>
+            <div class="cb" id="bsl-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
+          </div>
+          <div class="card">
+            <div class="ch"><span class="ct">Event trail — chronological</span></div>
+            <div class="tlist" id="trail-events"></div>
+          </div>
+        </div>
+      </div>
+      <div id="page-livealerts" class="page">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <button class="btn" onclick="loadLiveAlerts()">↻ Refresh</button>
+          <span style="font-size:12px;color:var(--muted);align-self:center">Events from hot IPs</span>
+        </div>
+        <div class="card">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Source IP</th>
+                <th>Threat</th>
+                <th>Rule</th>
+                <th>Severity</th>
+                <th>Dst IP</th>
+              </tr>
+            </thead>
+            <tbody id="live-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="page-deviations" class="page">
+        <div class="term-panel">
+          <div class="term-title">What baseline deviation means</div>
+          <div class="term-grid">
+            <div class="term"><b>Baseline</b> is the normal behaviour learned for an IP: usual ports, hours, destination
+              networks, countries, event volume, and alert types.</div>
+            <div class="term"><b>Deviation</b> means the IP did something outside that normal pattern, like touching a
+              new subnet, using a new admin port, or creating a volume spike.</div>
+            <div class="term"><b>Why SOC cares</b>: deviations are early warning signals for brute force, lateral
+              movement, proxy rotation, or compromised accounts.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+          <button class="btn pri" onclick="loadDeviations()">Load all deviations</button>
+          <button class="btn red" onclick="loadDeviations('critical')">Critical only</button>
+          <button class="btn yel" onclick="loadDeviations('high')">High only</button>
+          <button class="btn" onclick="buildAllBaselines()">↻ Rebuild all baselines</button>
+          <span id="dev-status" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="ch"><span class="ct">IPs with deviations — click to trail</span><span id="dev-ip-count"
+              style="font-size:11px;color:var(--muted)"></span></div>
+          <div class="cb" id="dev-ip-chips" style="min-height:40px"></div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">All deviation alerts</span><span id="dev-total"
+              style="font-size:11px;color:var(--muted)"></span></div>
+          <div style="max-height:520px;overflow-y:auto" id="dev-list">
+            <div class="empty">Click "Load all deviations" to see baseline alerts</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Deviation type breakdown</span></div>
+          <div class="cb">
+            <div style="height:220px"><canvas id="ch-devbar"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div id="page-bslexplorer" class="page">
+        <div class="term-panel">
+          <div class="term-title">How to read a baseline profile</div>
+          <div class="term-grid">
+            <div class="term"><b>Usual hours</b> show when this IP normally appears. Off-hours activity can mean
+              attacker activity or abused automation.</div>
+            <div class="term"><b>Usual ports</b> show expected services. A new SSH/RDP/database port is more suspicious
+              than a repeated normal web port.</div>
+            <div class="term"><b>Deviation alerts</b> are the concrete reasons this IP broke its own behavioural
+              baseline.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="cb" style="display:flex;gap:10px">
+            <input id="bsl-ip" placeholder="Enter IP to explore its baseline…"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
+            <button class="btn pri" onclick="exploreBaseline()">Explore</button>
+            <button class="btn" onclick="forceRebuild()">Force rebuild</button>
+          </div>
+        </div>
+        <div id="bsl-explorer-panel" style="display:none">
+          <div class="bsl-stat">
+            <div class="bsl-box">
+              <div class="bsl-box-val mv-a" id="bx-events">—</div>
+              <div class="bsl-box-lbl">Events in baseline</div>
+            </div>
+            <div class="bsl-box">
+              <div class="bsl-box-val mv-w" id="bx-daily">—</div>
+              <div class="bsl-box-lbl">Avg events/day</div>
+            </div>
+            <div class="bsl-box">
+              <div class="bsl-box-val mv-d" id="bx-alerts">—</div>
+              <div class="bsl-box-lbl">Deviation alerts</div>
+            </div>
+          </div>
+          <div class="cg2">
+            <div class="card">
+              <div class="ch"><span class="ct">Usual hours (UTC)</span></div>
+              <div class="cb">
+                <div style="height:180px"><canvas id="ch-hours"></canvas></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ch"><span class="ct">Usual ports</span></div>
+              <div class="cb">
+                <div style="height:180px"><canvas id="ch-ports"></canvas></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ch"><span class="ct">Baseline profile</span></div>
+            <div class="cb" id="bx-profile" style="font-size:12px;color:var(--muted);line-height:2"></div>
+          </div>
+          <div class="card">
+            <div class="ch"><span class="ct">Deviation alerts for this IP</span></div>
+            <div style="max-height:320px;overflow-y:auto" id="bx-alerts-list"></div>
+          </div>
+        </div>
+      </div>
+      <div id="page-aiinvestigate" class="page">
+        <div class="term-panel">
+          <div class="term-title">What AI analysis adds</div>
+          <div class="term-grid">
+            <div class="term"><b>AI explanation</b> turns the existing trail, baseline, alert, and ML values into
+              analyst-readable reasoning.</div>
+            <div class="term"><b>Grounding</b> means the AI is prompted with the actual IP events and scores already
+              stored in Redis.</div>
+            <div class="term"><b>Fallback</b> remains available: the rule-based explanations still show when the AI key
+              is not configured.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="ch"><span class="ct">AI Investigator</span><span
+              style="font-size:11px;color:var(--muted)">Requires AI API key in .env</span></div>
+          <div class="cb">
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+              <input id="ai-ip-input" placeholder="Enter IP address to investigate…"
+                style="flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
+              <button class="btn ai" onclick="aiFullInvestigate()">Full AI investigation</button>
+              <button class="btn" onclick="aiMLExplain()">Why ML flagged it</button>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <textarea id="ai-pattern-input" rows="3" placeholder="Paste any raw pattern or JSON for AI analysis…"
+                style="flex:1;min-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:12px;outline:none;resize:vertical;font-family:var(--mono)"></textarea>
+              <button class="btn ai" style="align-self:flex-end" onclick="aiAnalysePattern()">Analyse pattern</button>
+            </div>
+          </div>
+        </div>
+        <div id="ai-investigate-panel" style="display:none" class="ai-panel">
+          <div class="ai-header">
+            <span class="ai-badge">AI</span>
+            <span class="ai-title" id="ai-inv-title">Investigation</span>
+            <span class="ai-model" id="ai-inv-model"></span>
+          </div>
+          <div id="ai-inv-body" class="ai-body"></div>
+        </div>
+      </div>
+      <div id="page-ml" class="page">
+        <div class="term-panel">
+          <div class="term-title">How to read ML anomaly scoring</div>
+          <div class="term-grid">
+            <div class="term"><b>Anomaly score</b> is the raw Isolation Forest output. Lower/negative means the IP looks
+              more unusual compared with other IPs.</div>
+            <div class="term"><b>Risk score</b> is the SOC-facing 0-100 danger score. It combines ML abnormality plus
+              baseline and threat signals.</div>
+            <div class="term"><b>Confidence</b> says how much evidence supports that risk. Few logs means lower
+              confidence, even if the IP looks suspicious.</div>
+            <div class="term"><b>Isolation Forest</b> finds IPs that are isolated from normal behaviour patterns. It
+              does not know "bad"; it finds outliers.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+          <button class="btn pri" onclick="trainModel()">Train ML model</button>
+          <button class="btn" onclick="loadAnomalies()">Load anomalies</button>
+          <span id="train-status" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input id="ml-ip" placeholder="Score a specific IP…"
+            style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
+          <button class="btn" onclick="scoreIP()">Score IP</button>
+          <button class="btn ai" onclick="aiMLExplainFromInput()">AI explain</button>
+        </div>
+        <div id="score-panel" style="display:none" class="card">
+          <div class="ch"><span class="ct">IP Risk Score</span></div>
+          <div class="cb" id="score-body"></div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Detected anomalies — Isolation Forest + Baseline boost</span></div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>IP</th>
+                <th>Risk score</th>
+                <th>Anomaly score</th>
+                <th>Level</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="anom-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="page-clusters" class="page">
+        <div style="margin-bottom:16px">
+          <button class="btn pri" onclick="loadClusters()">Analyse clusters</button>
+          <span style="font-size:12px;color:var(--muted);margin-left:12px">Finds coordinated groups by /24 subnet</span>
+        </div>
+        <div id="clusters-body"></div>
+      </div>
+      <div id="page-blocklist" class="page">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input id="block-ip" placeholder="Manually block an IP…"
+            style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
+          <button class="btn red" onclick="manualBlock()">Block</button>
+          <button class="btn" onclick="loadBlocklist()">↻ Refresh</button>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Active blocklist</span><span id="bl-count"
+              style="font-size:11px;color:var(--muted)"></span></div>
+          <div class="cb" id="bl-body"></div>
+        </div>
+      </div>
+      <div id="page-ingest" class="page">
+        <div class="card" style="margin-bottom:16px">
+          <div class="ch"><span class="ct">Upload CSV log file</span></div>
+          <div class="cb">
+            <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()"
+              ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave()">
+              <h3 style="margin-bottom:8px">Drop CSV file here</h3>
+              <p style="color:var(--muted);font-size:12px">or click to browse</p>
+              <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="uploadCSV(this.files[0])" />
+            </div>
+            <div class="prog-wrap" id="prog-wrap">
+              <div class="prog-bar" id="prog-bar" style="width:0%"></div>
+            </div>
+            <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Paste single JSON log</span></div>
+          <div class="cb">
+            <textarea id="json-log" rows="4"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;resize:vertical"
+              placeholder='{"@timestamp":"2026-04-22T09:30:00Z","rule.description":"Fortigate: Login failed.","data.ui":"85.11.187.36","data.level":"alert"}'></textarea>
+            <button class="btn pri" style="margin-top:10px" onclick="ingestJSON()">Ingest</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Quick actions</span></div>
+          <div class="cb" style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn yel" onclick="buildAllBaselines()">Build all baselines</button>
+            <button class="btn pri" onclick="trainModelQuick()">Train ML model</button>
+            <span id="qa-status" style="font-size:12px;color:var(--muted);align-self:center"></span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="toast-wrap" id="toast-wrap"></div>
+  <script>
+    const API = '/api', ML = '/api/ml';
+    let charts = {}, curIP = '';
+
+    function nav(name) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+      document.getElementById('page-' + name).classList.add('active');
+      document.querySelectorAll('.ni').forEach(n => {
+        if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + name + "'")) n.classList.add('active');
+      });
+      const T = {
+        overview: 'Overview', trail: 'IP Trail', livealerts: 'Live Alerts',
+        deviations: 'Baseline Deviations', bslexplorer: 'Baseline Explorer',
+        aiinvestigate: 'AI Investigator', ml: 'ML Anomaly', clusters: 'Subnet Clusters',
+        blocklist: 'Blocklist', ingest: 'Ingest Logs'
+      };
+      document.getElementById('page-title').textContent = T[name] || name;
+      if (name === 'overview') refreshAll();
+      if (name === 'livealerts') loadLiveAlerts();
+      if (name === 'blocklist') loadBlocklist();
+      if (name === 'clusters') loadClusters();
+      if (name === 'ml') loadAnomalies();
+      if (name === 'deviations') loadDeviations();
+    }
+    function toast(msg, type = 'ok') {
+      const w = document.getElementById('toast-wrap');
+      const el = document.createElement('div');
+      el.className = 'toast ' + type; el.textContent = msg;
+      w.appendChild(el); setTimeout(() => el.remove(), 3500);
+    }
+    async function get(url) {
+      try { const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+      catch (e) { toast('API: ' + e.message, 'err'); return null; }
+    }
+    async function post(url, body = null) {
+      try {
+        const opts = { method: 'POST' };
+        if (body) { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(body); }
+        const r = await fetch(url, opts); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json();
+      } catch (e) { toast('API: ' + e.message, 'err'); return null; }
+    }
+    async function postForm(url, fd) {
+      try { const r = await fetch(url, { method: 'POST', body: fd }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+      catch (e) { toast('API: ' + e.message, 'err'); return null; }
+    }
+    async function del(url) {
+      try { const r = await fetch(url, { method: 'DELETE' }); return await r.json(); }
+      catch (e) { toast('API: ' + e.message, 'err'); return null; }
+    }
+    const COLORS = ['#f85149', '#e3b341', '#58a6ff', '#3fb950', '#bc8cff', '#f0883e', '#39d353', '#ffa657', '#79c0ff', '#d2a8ff'];
+    function pie(id, counts) {
+      const labels = Object.keys(counts), data = Object.values(counts);
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: COLORS.slice(0, labels.length), borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 10, padding: 8 } } } }
+      });
+    }
+    function bar(id, labels, data, color = '#58a6ff', horizontal = false) {
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 3 }] },
+        options: { indexAxis: horizontal ? 'y' : 'x', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }, y: { ticks: { color: '#8b949e', font: { size: 10, family: 'Courier New' } }, grid: { color: '#21262d' } } } }
+      });
+    }
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+    function aiLoading(el) {
+      el.innerHTML = '<div class="ai-loading"><div class="ai-spin"></div>AI is analysing the current evidence…</div>';
+    }
+    function formatAIText(text) {
+      return escapeHTML(text)
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/^(WHAT HAPPENED|WHY IT IS DANGEROUS|WHAT CHANGED|IMMEDIATE ACTION|WHAT THIS ALERT MEANS|WHY IT IS [A-Z]+|WHAT TO DO|WHY THIS SCORE|WHAT THE ANOMALY SCORE MEANS|CONFIDENCE|PATTERN|KNOWN TECHNIQUE|RISK|ACTION):/gm, '<span class="ai-section">$1</span>')
+        .split(/\n{2,}/)
+        .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+    }
+    function setSignal(id, value, cap, suffix = '') {
+      const safeValue = Number(value || 0);
+      const pct = Math.max(0, Math.min(100, cap ? (safeValue / cap) * 100 : 0));
+      const barEl = document.getElementById(id);
+      const valueEl = document.getElementById(id + '-v');
+      if (barEl) barEl.style.width = pct.toFixed(0) + '%';
+      if (valueEl) valueEl.textContent = suffix ? safeValue.toFixed(0) + suffix : safeValue.toLocaleString();
+    }
+    function severityRank(severities = {}) {
+      const rank = { critical: 4, high: 3, medium: 2, low: 1 };
+      return Object.entries(severities).sort((a, b) => (rank[b[0]] || 0) - (rank[a[0]] || 0) || b[1] - a[1])[0] || ['low', 0];
+    }
+    function topThreat(threats = {}) {
+      return Object.entries(threats).sort((a, b) => b[1] - a[1])[0] || ['unknown', 0];
+    }
+    async function refreshAll() {
+      const s = await get(`${API}/stats`); if (!s) return;
+      const totalLogs = Number(s.total_logs || 0);
+      const hotCount = (s.hot_ips || []).length;
+      const criticalCount = (s.critical_ips || []).length;
+      const blockedCount = (s.blocklist || []).length;
+      const alertCount = Number(s.total_alerts || 0);
+      const threatIndex = Math.max(0, Math.min(100, Math.round((criticalCount * 2.6) + (hotCount * .18) + (alertCount * .01) + (blockedCount * .16))));
+      document.getElementById('m-total').textContent = s.total_logs.toLocaleString();
+      document.getElementById('m-ips').textContent = s.unique_ips.toLocaleString();
+      document.getElementById('m-hot').textContent = hotCount;
+      document.getElementById('m-balerts').textContent = alertCount;
+      document.getElementById('m-crit').textContent = criticalCount;
+      document.getElementById('m-blocked').textContent = blockedCount;
+      document.getElementById('ops-total').textContent = totalLogs.toLocaleString();
+      document.getElementById('ops-critical').textContent = criticalCount;
+      document.getElementById('ops-blocked').textContent = blockedCount;
+      document.getElementById('threat-index').textContent = threatIndex;
+      document.getElementById('threat-dial').style.setProperty('--risk', threatIndex);
+      document.getElementById('dial-hot').textContent = 'HOT ' + hotCount.toLocaleString();
+      document.getElementById('dial-alerts').textContent = 'ALERTS ' + alertCount.toLocaleString();
+      document.getElementById('matrix-state').textContent = threatIndex >= 70 ? 'CRITICAL' : threatIndex >= 40 ? 'ELEVATED' : threatIndex > 0 ? 'ACTIVE' : 'QUIET';
+      document.getElementById('threat-caption').textContent = threatIndex >= 70
+        ? 'Critical operating pressure. Triage active sources, deviations, and blocks immediately.'
+        : threatIndex >= 40
+          ? 'Elevated activity. Focus on critical IPs, new baselines, and ML outliers.'
+          : threatIndex > 0
+            ? 'Active monitoring. Signals are present but currently below emergency threshold.'
+            : 'No active high-pressure signal from retained telemetry.';
+      setSignal('sig-hot', hotCount, Math.max(50, hotCount));
+      setSignal('sig-critical', criticalCount, Math.max(25, criticalCount));
+      setSignal('sig-alerts', alertCount, Math.max(100, alertCount));
+      setSignal('sig-blocked', blockedCount, Math.max(50, blockedCount));
+      const coverage = s.unique_ips ? Math.min(100, Math.round((hotCount / Math.max(s.unique_ips, 1)) * 100)) : 0;
+      const covEl = document.getElementById('sig-coverage');
+      const covValue = document.getElementById('sig-coverage-v');
+      if (covEl) covEl.style.width = coverage + '%';
+      if (covValue) covValue.textContent = coverage + '%';
+      const posture = criticalCount > 25 ? 'Critical attack pressure' : criticalCount > 0 ? 'Elevated threat posture' : hotCount > 0 ? 'Active monitoring posture' : 'Stable monitoring posture';
+      const copy = criticalCount > 25
+        ? `${criticalCount} critical IPs and ${hotCount} hot IPs are visible. Prioritise deviations, high-risk ML scores, and active block controls.`
+        : criticalCount > 0
+          ? `${criticalCount} critical IPs detected across ${totalLogs.toLocaleString()} retained logs. Review high-impact deviations first.`
+          : `${totalLogs.toLocaleString()} logs are retained with ${hotCount} hot IPs currently indexed for rapid triage.`;
+      document.getElementById('ops-posture').textContent = posture;
+      document.getElementById('ops-copy').textContent = copy;
+      document.getElementById('last-ref').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
+      const aiReady = s.ai_configured;
+      document.getElementById('ai-status').innerHTML = aiReady
+        ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--ai);display:inline-block"></span> AI ready'
+        : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> AI key missing';
+      if (s.threat_counts && Object.keys(s.threat_counts).length) pie('ch-threats', s.threat_counts);
+      if (s.alert_type_counts && Object.keys(s.alert_type_counts).length) pie('ch-devtypes', s.alert_type_counts);
+      const hot = await get(`${API}/hot-ips`);
+      if (hot) {
+        document.getElementById('hot-count').textContent = hot.length + ' IPs';
+        document.getElementById('watchlist').innerHTML = hot.length
+          ? hot.slice(0, 5).map(h => {
+            const [threatName, threatCount] = topThreat(h.threat_types);
+            const [sev] = severityRank(h.severities);
+            const score = Math.min(99, Math.max(12, Math.round((Number(h.total || 0) * .18) + (sev === 'critical' ? 42 : sev === 'high' ? 28 : sev === 'medium' ? 16 : 9))));
+            return `<div class="watch-item" onclick="goTrail('${h.ip}')">
+          <div class="watch-ip">${h.ip}</div>
+          <div class="watch-meta">${String(threatName).replace(/_/g, ' ')} · ${threatCount} signals · ${Number(h.total || 0).toLocaleString()} events</div>
+          <div class="watch-score ${sev}">${score}</div>
+        </div>`;
+          }).join('')
+          : '<div class="empty" style="padding:18px">No hot IPs in the current index</div>';
+        document.getElementById('hot-tbody').innerHTML = hot.slice(0, 30).map(h => {
+          const tt = topThreat(h.threat_types);
+          const sv = severityRank(h.severities);
+          return `<tr onclick="goTrail('${h.ip}')" style="cursor:pointer">
         <td style="color:var(--accent);font-weight:600">${h.ip}</td>
         <td>${h.total}</td>
-        <td style="font-size:11px;color:var(--muted)">${(h.first_seen||'').substring(0,19).replace('T',' ')}</td>
-        <td style="font-size:11px;color:var(--muted)">${(h.last_seen||'').substring(0,19).replace('T',' ')}</td>
-        <td>${(tt[0]||'').replace(/_/g,' ')}</td>
-        <td><span class="badge ${sv?sv[0]:'low'}">${sv?sv[0]:'low'}</span></td>
-        <td><button class="btn" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();goTrail('${h.ip}')">Trail</button></td>
+        <td style="font-size:11px;color:var(--muted)">${(h.first_seen || '').substring(0, 19).replace('T', ' ')}</td>
+        <td style="font-size:11px;color:var(--muted)">${(h.last_seen || '').substring(0, 19).replace('T', ' ')}</td>
+        <td>${(tt[0] || '').replace(/_/g, ' ')}</td>
+        <td><span class="badge ${sv ? sv[0] : 'low'}">${sv ? sv[0] : 'low'}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn" style="font-size:10px;padding:3px 8px;margin-right:3px" onclick="event.stopPropagation();goTrail('${h.ip}')">Trail</button>
+          <button class="btn ai" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();quickAI('${h.ip}')">AI</button>
+        </td>
       </tr>`;
-    }).join('');
-  }
-  const mlh=await get(`${ML}/health`);
-  if(mlh){
-    document.getElementById('ml-status').innerHTML=mlh.model_ready
-      ?'<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
-      :'<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> Not trained';
-  }
-}
-function doSearch(){const q=document.getElementById('ip-search').value.trim(); if(!q)return; goTrail(q);}
-function goTrail(ip){nav('trail'); document.getElementById('trail-input').value=ip; loadTrail();}
-async function loadTrail(){
-  const ip=document.getElementById('trail-input').value.trim(); if(!ip)return;
-  curIP=ip;
-  const [sum,trail]=await Promise.all([get(`${API}/trail/${ip}/summary`),get(`${API}/trail/${ip}?limit=200`)]);
-  if(!sum||!sum.found){toast('No events for '+ip,'warn'); return;}
-  document.getElementById('trail-panel').style.display='block';
-  document.getElementById('t-ip').textContent=ip;
-  document.getElementById('t-total').textContent=sum.total;
-  document.getElementById('t-first').textContent=(sum.first_seen||'').substring(0,19).replace('T',' ');
-  document.getElementById('t-last').textContent=(sum.last_seen||'').substring(0,19).replace('T',' ');
-  const tt=sum.threat_types?Object.entries(sum.threat_types).sort((a,b)=>b[1]-a[1])[0]:['unknown',0];
-  document.getElementById('t-threat').textContent=(tt[0]||'').replace(/_/g,' ');
-  const sv=sum.severities?Object.entries(sum.severities).sort((a,b)=>b[1]-a[1])[0]:['low',0];
-  const b=document.getElementById('t-sev-badge');
-  b.className='badge '+(sv?sv[0]:'low'); b.textContent=sv?sv[0]:'low';
-  document.getElementById('t-blocked-badge').style.display=sum.is_blocked?'inline-block':'none';
-  document.getElementById('t-badges').innerHTML=Object.entries(sum.threat_types||{}).map(([k,v])=>`<span class="badge medium" style="margin-bottom:4px">${k.replace(/_/g,' ')}: ${v}</span>`).join('');
-  if(trail&&trail.events){
-    document.getElementById('trail-events').innerHTML=trail.events.length?trail.events.map(e=>{
-      const sc=e.severity||'low';
-      return `<div class="ti">
+        }).join('');
+      }
+      const mlh = await get(`${ML}/health`);
+      if (mlh) {
+        document.getElementById('ml-status').innerHTML = mlh.model_ready
+          ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
+          : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> Not trained';
+      }
+    }
+    function doSearch() { const q = document.getElementById('ip-search').value.trim(); if (!q) return; goTrail(q); }
+    function goTrail(ip) { nav('trail'); document.getElementById('trail-input').value = ip; loadTrail(); }
+    async function quickAI(ip) {
+      nav('aiinvestigate');
+      document.getElementById('ai-ip-input').value = ip;
+      await aiFullInvestigate();
+    }
+    async function loadTrail() {
+      const ip = document.getElementById('trail-input').value.trim(); if (!ip) return;
+      curIP = ip;
+      const [sum, trail] = await Promise.all([get(`${API}/trail/${ip}/summary`), get(`${API}/trail/${ip}?limit=200`)]);
+      if (!sum || !sum.found) { toast('No events for ' + ip, 'warn'); return; }
+      document.getElementById('trail-panel').style.display = 'block';
+      document.getElementById('t-ip').textContent = ip;
+      document.getElementById('t-total').textContent = sum.total;
+      document.getElementById('t-first').textContent = (sum.first_seen || '').substring(0, 19).replace('T', ' ');
+      document.getElementById('t-last').textContent = (sum.last_seen || '').substring(0, 19).replace('T', ' ');
+      const tt = sum.threat_types ? Object.entries(sum.threat_types).sort((a, b) => b[1] - a[1])[0] : ['unknown', 0];
+      document.getElementById('t-threat').textContent = (tt[0] || '').replace(/_/g, ' ');
+      const sv = sum.severities ? Object.entries(sum.severities).sort((a, b) => b[1] - a[1])[0] : ['low', 0];
+      const b = document.getElementById('t-sev-badge');
+      b.className = 'badge ' + (sv ? sv[0] : 'low'); b.textContent = sv ? sv[0] : 'low';
+      document.getElementById('t-blocked-badge').style.display = sum.is_blocked ? 'inline-block' : 'none';
+      document.getElementById('t-badges').innerHTML = Object.entries(sum.threat_types || {}).map(([k, v]) => `<span class="badge medium" style="margin-bottom:4px">${k.replace(/_/g, ' ')}: ${v}</span>`).join('');
+      document.getElementById('ai-trail-panel').style.display = 'none';
+      if (trail && trail.events) {
+        document.getElementById('trail-events').innerHTML = trail.events.length ? trail.events.map(e => {
+          const sc = e.severity || 'low';
+          return `<div class="ti">
         <span class="tdot ${sc}"></span>
-        <span class="tts">${(e.ts||'').substring(0,19).replace('T',' ')}</span>
+        <span class="tts">${(e.ts || '').substring(0, 19).replace('T', ' ')}</span>
         <span class="tdesc">
-          <b>${(e.threat_type||'unknown').replace(/_/g,' ')}</b> — ${e.rule||''}
-          ${e.signature?`<br><span style="color:var(--accent);font-size:11px">${e.signature}</span>`:''}
-          ${e.dst_ip?`<br>→ ${e.dst_ip}${e.dst_port?':'+e.dst_port:''}`:''}
-          ${e.mitre?`<span style="background:rgba(188,140,255,.15);color:#bc8cff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px">${e.mitre}</span>`:''}
+          <b>${(e.threat_type || 'unknown').replace(/_/g, ' ')}</b> — ${e.rule || ''}
+          ${e.signature ? `<br><span style="color:var(--accent);font-size:11px">${e.signature}</span>` : ''}
+          ${e.dst_ip ? `<br>→ ${e.dst_ip}${e.dst_port ? ':' + e.dst_port : ''}` : ''}
+          ${e.mitre ? `<span style="background:rgba(188,140,255,.15);color:#bc8cff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px">${e.mitre}</span>` : ''}
         </span>
         <span class="badge ${sc}">${sc}</span>
       </div>`;
-    }).join(''):'<div class="empty">No events</div>';
-  }
-}
-async function loadIntel(){
-  if(!curIP)return;
-  const d=await get(`${API}/intel/${curIP}`); if(!d)return;
-  document.getElementById('intel-panel').style.display='block';
-  let h=`<b>IP:</b> ${d.ip} &nbsp;|&nbsp; <b>Known bad:</b> ${d.is_known_bad?'<span style="color:var(--danger)">YES</span>':'No'} &nbsp;|&nbsp; <b>Blocked:</b> ${d.in_blocklist?'<span style="color:var(--danger)">YES</span>':'No'}<br>`;
-  if(d.abuseipdb){const a=d.abuseipdb; h+=`<b>AbuseIPDB:</b> <span style="color:${a.score>50?'var(--danger)':a.score>25?'var(--warn)':'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp; <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor?'Yes':'No'}`;}
-  else h+=`<span style="color:var(--muted)">AbuseIPDB not configured</span>`;
-  document.getElementById('intel-body').innerHTML=h;
-}
-async function loadBaseline(){
-  if(!curIP)return;
-  const [bsl,alr]=await Promise.all([get(`${API}/baseline/${curIP}`),get(`${API}/alerts/${curIP}`)]);
-  document.getElementById('bsl-panel').style.display='block';
-  const ac=alr&&alr.alerts?alr.alerts.length:0;
-  document.getElementById('bsl-alert-count').textContent=ac?`⚠ ${ac} deviation alert(s)`:'';
-  let h='';
-  if(bsl&&bsl.found){
-    const b=bsl.baseline;
-    h+=`<b>Built:</b> ${(b.built_at||'').substring(0,19).replace('T',' ')} &nbsp;|&nbsp; <b>Events:</b> ${b.event_count}<br>`;
-    h+=`<b>Avg daily:</b> ${b.avg_daily_events}/day &nbsp;|&nbsp; <b>Avg severity:</b> ${b.avg_severity_score} (1=low 4=critical)<br>`;
-    h+=`<b>Login failures:</b> ${b.total_failures} &nbsp;|&nbsp; <b>Successes:</b> ${b.total_successes}<br>`;
-    h+=`<b>Usual ports:</b> ${Object.keys(b.usual_ports||{}).slice(0,8).join(', ')||'none'}<br>`;
-    h+=`<b>Countries:</b> ${Object.keys(b.usual_countries||{}).join(', ')||'none'}<br>`;
-    h+=`<b>Active hours (UTC):</b> ${Object.keys(b.usual_hours||{}).sort((a,c)=>+a-+c).map(x=>x.padStart(2,'0')+':00').join(', ')||'none'}<br>`;
-    h+=`<b>Weekdays:</b> ${Object.keys(b.usual_weekdays||{}).map(d=>['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][+d]).join(', ')||'none'}<br>`;
-    h+=`<b>Threat types seen:</b> ${Object.keys(b.usual_rule_groups||{}).map(k=>k.replace(/_/g,' ')).join(', ')||'none'}<br>`;
-    if(alr&&alr.alerts&&alr.alerts.length){
-      h+=`<br><b style="color:var(--danger)">⚠ ${alr.alerts.length} Deviation alert(s) — see Baseline Explorer for full explainers</b><br>`;
-      alr.alerts.forEach(a=>{
-        const exp=alertWhy(a.type,a.severity);
-        h+=`<div style="margin:4px 0;padding:7px 10px;background:var(--bg3);border-radius:5px;border-left:3px solid ${a.severity==='critical'?'var(--danger)':'var(--warn)'}">`;
-        h+=`<span style="color:${a.severity==='critical'?'var(--danger)':'var(--warn)'};font-weight:700;font-size:11px">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span> `;
-        h+=`<span style="font-size:12px;color:var(--text)"> — ${a.message}</span><br>`;
-        h+=`<span style="font-size:11px;color:var(--muted)">${exp.action}</span></div>`;
-      });
+        }).join('') : '<div class="empty">No events</div>';
+      }
     }
-  } else h='<span style="color:var(--warn)">No baseline yet. Needs 10+ events. Use "Force rebuild" or wait for auto-build.</span>';
-  document.getElementById('bsl-body').innerHTML=h;
-}
-async function blockCurrent(){if(!curIP)return; await post(`${API}/blocklist/add`,{ip:curIP}); toast(curIP+' blocked','ok');}
-async function loadLiveAlerts(){
-  const hot=await get(`${API}/hot-ips`); if(!hot)return;
-  const all=[];
-  for(const h of hot.slice(0,15)){
-    const t=await get(`${API}/trail/${h.ip}?limit=20`);
-    if(t&&t.events) t.events.forEach(e=>all.push({...e,_ip:h.ip}));
-  }
-  all.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
-  document.getElementById('live-tbody').innerHTML=all.slice(0,100).map(e=>`<tr>
-    <td style="font-size:11px">${(e.ts||'').substring(0,19).replace('T',' ')}</td>
+    async function aiExplainIP() {
+      if (!curIP) return;
+      const panel = document.getElementById('ai-trail-panel');
+      const body = document.getElementById('ai-trail-body');
+      panel.style.display = 'block';
+      document.getElementById('ai-trail-title').textContent = 'AI analysis — ' + curIP;
+      document.getElementById('ai-trail-model').textContent = '';
+      aiLoading(body);
+      const r = await get(`${API}/explain/${curIP}`);
+      if (!r) { body.innerHTML = '<span style="color:var(--danger)">AI unavailable. Check the AI key in .env and restart backend.</span>'; return; }
+      document.getElementById('ai-trail-model').textContent = (r.model || 'AI model') + ' · ' + String(r.generated_at || '').substring(0, 19);
+      body.innerHTML = formatAIText(r.explanation);
+      toast('AI analysis ready', 'ai');
+    }
+    async function loadIntel() {
+      if (!curIP) return;
+      const d = await get(`${API}/intel/${curIP}`); if (!d) return;
+      document.getElementById('intel-panel').style.display = 'block';
+      let h = `<b>IP:</b> ${d.ip} &nbsp;|&nbsp; <b>Known bad:</b> ${d.is_known_bad ? '<span style="color:var(--danger)">YES</span>' : 'No'} &nbsp;|&nbsp; <b>Blocked:</b> ${d.in_blocklist ? '<span style="color:var(--danger)">YES</span>' : 'No'}<br>`;
+      if (d.abuseipdb) { const a = d.abuseipdb; h += `<b>AbuseIPDB:</b> <span style="color:${a.score > 50 ? 'var(--danger)' : a.score > 25 ? 'var(--warn)' : 'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp; <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor ? 'Yes' : 'No'}`; }
+      else h += `<span style="color:var(--muted)">AbuseIPDB not configured</span>`;
+      document.getElementById('intel-body').innerHTML = h;
+    }
+    async function loadBaseline() {
+      if (!curIP) return;
+      const [bsl, alr] = await Promise.all([get(`${API}/baseline/${curIP}`), get(`${API}/alerts/${curIP}`)]);
+      document.getElementById('bsl-panel').style.display = 'block';
+      const ac = alr && alr.alerts ? alr.alerts.length : 0;
+      document.getElementById('bsl-alert-count').textContent = ac ? `⚠ ${ac} deviation alert(s)` : '';
+      let h = '';
+      if (bsl && bsl.found) {
+        const b = bsl.baseline;
+        h += `<b>Built:</b> ${(b.built_at || '').substring(0, 19).replace('T', ' ')} &nbsp;|&nbsp; <b>Events:</b> ${b.event_count}<br>`;
+        h += `<b>Avg daily:</b> ${b.avg_daily_events}/day &nbsp;|&nbsp; <b>Avg severity:</b> ${b.avg_severity_score} (1=low 4=critical)<br>`;
+        h += `<b>Login failures:</b> ${b.total_failures} &nbsp;|&nbsp; <b>Successes:</b> ${b.total_successes}<br>`;
+        h += `<b>Usual ports:</b> ${Object.keys(b.usual_ports || {}).slice(0, 8).join(', ') || 'none'}<br>`;
+        h += `<b>Countries:</b> ${Object.keys(b.usual_countries || {}).join(', ') || 'none'}<br>`;
+        h += `<b>Active hours (UTC):</b> ${Object.keys(b.usual_hours || {}).sort((a, c) => +a - +c).map(x => x.padStart(2, '0') + ':00').join(', ') || 'none'}<br>`;
+        h += `<b>Weekdays:</b> ${Object.keys(b.usual_weekdays || {}).map(d => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][+d]).join(', ') || 'none'}<br>`;
+        h += `<b>Threat types seen:</b> ${Object.keys(b.usual_rule_groups || {}).map(k => k.replace(/_/g, ' ')).join(', ') || 'none'}<br>`;
+        if (alr && alr.alerts && alr.alerts.length) {
+          h += `<br><b style="color:var(--danger)">⚠ ${alr.alerts.length} Deviation alert(s) — see Baseline Explorer for full explainers</b><br>`;
+          alr.alerts.forEach(a => {
+            const exp = alertWhy(a.type, a.severity);
+            h += `<div style="margin:4px 0;padding:7px 10px;background:var(--bg3);border-radius:5px;border-left:3px solid ${a.severity === 'critical' ? 'var(--danger)' : 'var(--warn)'}">`;
+            h += `<span style="color:${a.severity === 'critical' ? 'var(--danger)' : 'var(--warn)'};font-weight:700;font-size:11px">${(a.type || '').replace(/_/g, ' ').toUpperCase()}</span> `;
+            h += `<span style="font-size:12px;color:var(--text)"> — ${a.message}</span><br>`;
+            h += `<span style="font-size:11px;color:var(--muted)">${exp.action}</span></div>`;
+          });
+        }
+      } else h = '<span style="color:var(--warn)">No baseline yet. Needs 10+ events. Use "Force rebuild" or wait for auto-build.</span>';
+      document.getElementById('bsl-body').innerHTML = h;
+    }
+    async function blockCurrent() { if (!curIP) return; await post(`${API}/blocklist/add`, { ip: curIP }); toast(curIP + ' blocked', 'ok'); }
+    async function loadLiveAlerts() {
+      const hot = await get(`${API}/hot-ips`); if (!hot) return;
+      const all = [];
+      for (const h of hot.slice(0, 15)) {
+        const t = await get(`${API}/trail/${h.ip}?limit=20`);
+        if (t && t.events) t.events.forEach(e => all.push({ ...e, _ip: h.ip }));
+      }
+      all.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+      document.getElementById('live-tbody').innerHTML = all.slice(0, 100).map(e => `<tr>
+    <td style="font-size:11px">${(e.ts || '').substring(0, 19).replace('T', ' ')}</td>
     <td style="color:var(--accent);cursor:pointer" onclick="goTrail('${e._ip}')">${e._ip}</td>
-    <td>${(e.threat_type||'').replace(/_/g,' ')}</td>
-    <td style="font-size:11px;color:var(--muted);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(e.rule||'').substring(0,55)}</td>
-    <td><span class="badge ${e.severity||'low'}">${e.severity||'low'}</span></td>
-    <td style="font-size:11px">${e.dst_ip||'—'}</td>
+    <td>${(e.threat_type || '').replace(/_/g, ' ')}</td>
+    <td style="font-size:11px;color:var(--muted);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(e.rule || '').substring(0, 55)}</td>
+    <td><span class="badge ${e.severity || 'low'}">${e.severity || 'low'}</span></td>
+    <td style="font-size:11px">${e.dst_ip || '—'}</td>
   </tr>`).join('');
-}
-const WHY = {
-  port_shift: {
-    why: "This IP has a history of connecting to specific ports. It just connected to a port it has <b>never used before</b>. Attackers change ports when pivoting laterally — moving from one system to another after initial access.",
-    action: { critical:"Isolate the source host immediately. Check if this port is a database or admin service.",
-               high:"Investigate the new port. Verify if any service should be accepting connections from this IP.",
-               medium:"Monitor closely. Correlate with other events from this IP.",
-               low:"Log and watch." }
-  },
-  sensitive_port_targeted: {
-    why: "A <b>database or admin port</b> (MySQL, PostgreSQL, RDP, SSH, SMB etc.) was hit for the first time by this IP. These ports are high-value targets — attackers scan them specifically to find unprotected services.",
-    action: { critical:"Block this IP immediately. Check if the service is exposed to the internet. Audit access logs on that service.",
-               high:"Verify if this access was authorised. Check firewall rules for this port.",
-               medium:"Review whether this port should be reachable from this IP.",
-               low:"Log and review." }
-  },
-  new_subnet_reached: {
-    why: "This IP has started reaching a <b>network segment it never contacted before</b>. Lateral movement almost always involves an attacker expanding from one subnet to another — from DMZ to internal, or from one VLAN to another.",
-    action: { critical:"Check if the new subnet is internal. If yes — treat as active lateral movement. Isolate immediately.",
-               high:"Investigate what hosts are in the new subnet. Check for any successful connections.",
-               medium:"Review network segmentation rules. Should this IP reach that subnet?",
-               low:"Log and monitor." }
-  },
-  internal_host_reached: {
-    why: "An <b>external IP is now reaching an internal RFC1918 address</b> (10.x / 192.168.x / 172.16.x). This should almost never happen. It means either your firewall has a hole, there is a misconfigured NAT rule, or a host inside your network is acting as a relay for the attacker.",
-    action: { critical:"STOP everything. Audit firewall rules for this IP immediately. Check if RDP relay activity is present. This is a confirmed breach indicator.",
-               high:"Block the external IP. Review all firewall allow rules that could permit this path.",
-               medium:"Investigate the network path. Check for proxy or relay hosts.",
-               low:"Review and audit." }
-  },
-  target_shift: {
-    why: "This IP used to hit <b>one or two hosts</b>. Now it is hitting many more unique destination IPs in a short window. This is the textbook signature of <b>lateral movement</b> — the attacker got in somewhere and is now scanning the internal network looking for more targets.",
-    action: { critical:"Treat as active lateral movement. Isolate the source. Check all destination hosts for compromise.",
-               high:"Map all destination IPs. Check if any are critical systems such as domain controllers, database servers, or file servers.",
-               medium:"Review the pattern. Is this a scanner or a person?",
-               low:"Monitor." }
-  },
-  country_shift: {
-    why: "The same IP is now appearing to originate from a <b>different country than usual</b>. This can mean the attacker switched VPN or proxy servers mid-campaign, or this IP was handed off to a different threat actor in a different location.",
-    action: { critical:"Treat as confirmed proxy rotation. Block the IP. Check if the original country events and new country events form a coherent attack chain.",
-               high:"Investigate the country change. Is this a legitimate geolocation update or proxy switching?",
-               medium:"Monitor and correlate with other indicators.",
-               low:"Log." }
-  },
-  off_hours_activity: {
-    why: "This IP is active at an <b>hour it has never been active before</b>. Normal business traffic and automated systems usually follow predictable schedules. Activity at unusual hours can indicate an attacker operating in a different timezone or a compromised automated system.",
-    action: { critical:"Check if any user account is associated with this IP. Verify whether this is legitimate admin work or an attacker.",
-               high:"Review what actions occurred during this off-hours window. Check login events.",
-               medium:"Correlate with VPN logs and user activity logs.",
-               low:"Log and monitor." }
-  },
-  weekend_anomaly: {
-    why: "This IP has <b>only ever been seen on weekdays</b> — but is now active on a weekend. Bank systems should have minimal external traffic on weekends. Attackers often choose weekends because monitoring is reduced and response times are slower.",
-    action: { critical:"Escalate to on-call SOC. Verify if any scheduled maintenance is planned. If not, treat as active attack.",
-               high:"Check what the IP is doing. Compare with weekday patterns.",
-               medium:"Investigate the business justification for weekend activity.",
-               low:"Log." }
-  },
-  volume_spike: {
-    why: "This IP sent <b>significantly more events than its daily baseline</b>. A sudden activity spike can indicate reconnaissance, brute force ramp-up, or an automated tool that just started running.",
-    action: { critical:"Check event types in the spike. If brute force or scanning is present, block immediately. If data transfer is present, check for exfiltration.",
-               high:"Analyse what events are spiking. Is this the same type as before or a new behaviour?",
-               medium:"Monitor the rate. Set an auto-block threshold if rate continues.",
-               low:"Watch the trend." }
-  },
-  new_rule_category: {
-    why: "This IP previously triggered one category of alerts, but now triggered a <b>completely new category</b>. This is an escalation signal because the attacker may have changed tactics or gained new capability.",
-    action: { critical:"Treat as escalation to exploitation phase. The attack has moved beyond reconnaissance. Isolate affected systems.",
-               high:"Investigate what changed. Did the attacker gain credentials? Did a new tool get deployed?",
-               medium:"Review the new rule type in context of the full attack timeline.",
-               low:"Log and watch." }
-  },
-  rule_escalation: {
-    why: "The <b>severity of events from this IP is trending upward</b>. It started with lower-severity events and is now triggering high or critical rules. This follows a typical attack progression from reconnaissance to exploitation.",
-    action: { critical:"The attacker may have reached exploitation phase. Check for successful logins, file access, or lateral movement.",
-               high:"Review the escalation timeline. Identify the exact point where severity jumped.",
-               medium:"Monitor for further escalation. Prepare to block.",
-               low:"Watch the trend." }
-  },
-  first_success_after_failures: {
-    why: "This IP had <b>many failed login attempts followed by a SUCCESS</b>. This is the most critical signal in brute force detection because it can mean the attacker found a valid credential.",
-    action: { critical:"IMMEDIATE ACTION: Disable the compromised account now. Check what happened after login. Review all sessions from this IP.",
-               high:"Verify if this success was legitimate. Check with the account owner.",
-               medium:"Review the login context. Was MFA bypassed?",
-               low:"Investigate." }
-  },
-  automated_tool_detected: {
-    why: "Events from this IP are arriving with <b>near-perfect timing intervals</b> — too regular to be a human. This is the signature of an automated scanner, brute force tool, or exploit framework.",
-    action: { critical:"Block the IP immediately. Automated tools can test many credentials quickly.",
-               high:"Rate-limit or block. Identify the tool by signature, user agent, or payload pattern.",
-               medium:"Monitor the tool's targets. Is it scanning one service or multiple?",
-               low:"Log the tool signature." }
-  },
-  dormant_ip_reactivated: {
-    why: "This IP was <b>inactive for a week or more and just came back</b>. Dormant IPs that suddenly reactivate can be botnet nodes, compromised devices coming back online, or an attacker returning to a previous target.",
-    action: { critical:"Treat as returning attacker. Review what this IP did before going dormant. Correlate with incidents during that period.",
-               high:"Check if the reactivation lines up with any other events in your environment.",
-               medium:"Monitor closely. Compare new activity with previous activity.",
-               low:"Log the gap and new activity." }
-  },
-};
-function alertWhy(type, severity) {
-  const e = WHY[type];
-  if (!e) return { why: 'Behavioural deviation detected — this IP is acting outside its established pattern.', action: 'Investigate this IP.' };
-  return { why: e.why, action: e.action?.[severity] || 'Investigate.' };
-}
-function renderAlert(a, showIP=true) {
-  const sc = a.severity || 'low';
-  const sevColor = {critical:'var(--danger)',high:'var(--warn)',medium:'var(--accent)',low:'var(--ok)'};
-  const exp = alertWhy(a.type, sc);
-  const details = a.details ? Object.entries(a.details).slice(0,4).map(([k,v]) =>
-    `<span class="alert-detail-chip">${k.replace(/_/g,' ')}: ${Array.isArray(v)?v.slice(0,3).join(', '):v}</span>`
-  ).join('') : '';
-  const actionIcon = {critical:'IMMEDIATE ACTION',high:'ACTION REQUIRED',medium:'INVESTIGATE',low:'MONITOR'}[sc] || 'Investigate';
-  return `<div class="alert-card ${sc}">
+    }
+    const WHY = {
+      port_shift: {
+        why: "This IP has a history of connecting to specific ports. It just connected to a port it has <b>never used before</b>. Attackers change ports when pivoting laterally — moving from one system to another after initial access.",
+        action: {
+          critical: "Isolate the source host immediately. Check if this port is a database or admin service.",
+          high: "Investigate the new port. Verify if any service should be accepting connections from this IP.",
+          medium: "Monitor closely. Correlate with other events from this IP.",
+          low: "Log and watch."
+        }
+      },
+      sensitive_port_targeted: {
+        why: "A <b>database or admin port</b> (MySQL, PostgreSQL, RDP, SSH, SMB etc.) was hit for the first time by this IP. These ports are high-value targets — attackers scan them specifically to find unprotected services.",
+        action: {
+          critical: "Block this IP immediately. Check if the service is exposed to the internet. Audit access logs on that service.",
+          high: "Verify if this access was authorised. Check firewall rules for this port.",
+          medium: "Review whether this port should be reachable from this IP.",
+          low: "Log and review."
+        }
+      },
+      new_subnet_reached: {
+        why: "This IP has started reaching a <b>network segment it never contacted before</b>. Lateral movement almost always involves an attacker expanding from one subnet to another — from DMZ to internal, or from one VLAN to another.",
+        action: {
+          critical: "Check if the new subnet is internal. If yes — treat as active lateral movement. Isolate immediately.",
+          high: "Investigate what hosts are in the new subnet. Check for any successful connections.",
+          medium: "Review network segmentation rules. Should this IP reach that subnet?",
+          low: "Log and monitor."
+        }
+      },
+      internal_host_reached: {
+        why: "An <b>external IP is now reaching an internal RFC1918 address</b> (10.x / 192.168.x / 172.16.x). This should almost never happen. It means either your firewall has a hole, there is a misconfigured NAT rule, or a host inside your network is acting as a relay for the attacker.",
+        action: {
+          critical: "STOP everything. Audit firewall rules for this IP immediately. Check if RDP relay activity is present. This is a confirmed breach indicator.",
+          high: "Block the external IP. Review all firewall allow rules that could permit this path.",
+          medium: "Investigate the network path. Check for proxy or relay hosts.",
+          low: "Review and audit."
+        }
+      },
+      target_shift: {
+        why: "This IP used to hit <b>one or two hosts</b>. Now it is hitting many more unique destination IPs in a short window. This is the textbook signature of <b>lateral movement</b> — the attacker got in somewhere and is now scanning the internal network looking for more targets.",
+        action: {
+          critical: "Treat as active lateral movement. Isolate the source. Check all destination hosts for compromise.",
+          high: "Map all destination IPs. Check if any are critical systems such as domain controllers, database servers, or file servers.",
+          medium: "Review the pattern. Is this a scanner or a person?",
+          low: "Monitor."
+        }
+      },
+      country_shift: {
+        why: "The same IP is now appearing to originate from a <b>different country than usual</b>. This can mean the attacker switched VPN or proxy servers mid-campaign, or this IP was handed off to a different threat actor in a different location.",
+        action: {
+          critical: "Treat as confirmed proxy rotation. Block the IP. Check if the original country events and new country events form a coherent attack chain.",
+          high: "Investigate the country change. Is this a legitimate geolocation update or proxy switching?",
+          medium: "Monitor and correlate with other indicators.",
+          low: "Log."
+        }
+      },
+      off_hours_activity: {
+        why: "This IP is active at an <b>hour it has never been active before</b>. Normal business traffic and automated systems usually follow predictable schedules. Activity at unusual hours can indicate an attacker operating in a different timezone or a compromised automated system.",
+        action: {
+          critical: "Check if any user account is associated with this IP. Verify whether this is legitimate admin work or an attacker.",
+          high: "Review what actions occurred during this off-hours window. Check login events.",
+          medium: "Correlate with VPN logs and user activity logs.",
+          low: "Log and monitor."
+        }
+      },
+      weekend_anomaly: {
+        why: "This IP has <b>only ever been seen on weekdays</b> — but is now active on a weekend. Bank systems should have minimal external traffic on weekends. Attackers often choose weekends because monitoring is reduced and response times are slower.",
+        action: {
+          critical: "Escalate to on-call SOC. Verify if any scheduled maintenance is planned. If not, treat as active attack.",
+          high: "Check what the IP is doing. Compare with weekday patterns.",
+          medium: "Investigate the business justification for weekend activity.",
+          low: "Log."
+        }
+      },
+      volume_spike: {
+        why: "This IP sent <b>significantly more events than its daily baseline</b>. A sudden activity spike can indicate reconnaissance, brute force ramp-up, or an automated tool that just started running.",
+        action: {
+          critical: "Check event types in the spike. If brute force or scanning is present, block immediately. If data transfer is present, check for exfiltration.",
+          high: "Analyse what events are spiking. Is this the same type as before or a new behaviour?",
+          medium: "Monitor the rate. Set an auto-block threshold if rate continues.",
+          low: "Watch the trend."
+        }
+      },
+      new_rule_category: {
+        why: "This IP previously triggered one category of alerts, but now triggered a <b>completely new category</b>. This is an escalation signal because the attacker may have changed tactics or gained new capability.",
+        action: {
+          critical: "Treat as escalation to exploitation phase. The attack has moved beyond reconnaissance. Isolate affected systems.",
+          high: "Investigate what changed. Did the attacker gain credentials? Did a new tool get deployed?",
+          medium: "Review the new rule type in context of the full attack timeline.",
+          low: "Log and watch."
+        }
+      },
+      rule_escalation: {
+        why: "The <b>severity of events from this IP is trending upward</b>. It started with lower-severity events and is now triggering high or critical rules. This follows a typical attack progression from reconnaissance to exploitation.",
+        action: {
+          critical: "The attacker may have reached exploitation phase. Check for successful logins, file access, or lateral movement.",
+          high: "Review the escalation timeline. Identify the exact point where severity jumped.",
+          medium: "Monitor for further escalation. Prepare to block.",
+          low: "Watch the trend."
+        }
+      },
+      first_success_after_failures: {
+        why: "This IP had <b>many failed login attempts followed by a SUCCESS</b>. This is the most critical signal in brute force detection because it can mean the attacker found a valid credential.",
+        action: {
+          critical: "IMMEDIATE ACTION: Disable the compromised account now. Check what happened after login. Review all sessions from this IP.",
+          high: "Verify if this success was legitimate. Check with the account owner.",
+          medium: "Review the login context. Was MFA bypassed?",
+          low: "Investigate."
+        }
+      },
+      automated_tool_detected: {
+        why: "Events from this IP are arriving with <b>near-perfect timing intervals</b> — too regular to be a human. This is the signature of an automated scanner, brute force tool, or exploit framework.",
+        action: {
+          critical: "Block the IP immediately. Automated tools can test many credentials quickly.",
+          high: "Rate-limit or block. Identify the tool by signature, user agent, or payload pattern.",
+          medium: "Monitor the tool's targets. Is it scanning one service or multiple?",
+          low: "Log the tool signature."
+        }
+      },
+      dormant_ip_reactivated: {
+        why: "This IP was <b>inactive for a week or more and just came back</b>. Dormant IPs that suddenly reactivate can be botnet nodes, compromised devices coming back online, or an attacker returning to a previous target.",
+        action: {
+          critical: "Treat as returning attacker. Review what this IP did before going dormant. Correlate with incidents during that period.",
+          high: "Check if the reactivation lines up with any other events in your environment.",
+          medium: "Monitor closely. Compare new activity with previous activity.",
+          low: "Log the gap and new activity."
+        }
+      },
+    };
+    function alertWhy(type, severity) {
+      const e = WHY[type];
+      if (!e) return { why: 'Behavioural deviation detected — this IP is acting outside its established pattern.', action: 'Investigate this IP.' };
+      return { why: e.why, action: e.action?.[severity] || 'Investigate.' };
+    }
+    function renderAlert(a, showIP = true) {
+      const sc = a.severity || 'low';
+      const sevColor = { critical: 'var(--danger)', high: 'var(--warn)', medium: 'var(--accent)', low: 'var(--ok)' };
+      const exp = alertWhy(a.type, sc);
+      const details = a.details ? Object.entries(a.details).slice(0, 4).map(([k, v]) =>
+        `<span class="alert-detail-chip"><b>${k.replace(/_/g, ' ')}</b><em>${Array.isArray(v) ? v.slice(0, 3).join(', ') : v}</em></span>`
+      ).join('') : '';
+      const actionIcon = { critical: 'IMMEDIATE ACTION', high: 'ACTION REQUIRED', medium: 'INVESTIGATE', low: 'MONITOR' }[sc] || 'Investigate';
+      return `<div class="alert-card ${sc}">
     <div class="alert-top">
-      ${showIP?`<span class="alert-ip-label" onclick="goTrail('${a.ip}')">${a.ip}</span>`:''}
-      <span class="alert-type-label" style="color:${sevColor[sc]}">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span>
-      <span class="badge ${sc}">${sc}</span>
-      <span class="alert-time">${(a.ts||'').substring(11,19)}</span>
+      <div class="alert-head-main">
+        ${showIP ? `<span class="alert-ip-label" onclick="goTrail('${a.ip}')">${a.ip}</span>` : ''}
+        <span class="alert-type-label" style="color:${sevColor[sc]}">${(a.type || '').replace(/_/g, ' ').toUpperCase()}</span>
+      </div>
+      <div class="alert-head-tools">
+        <span class="badge ${sc}">${sc}</span>
+        <button class="btn ai" style="font-size:10px;padding:2px 8px" onclick="aiExplainAlert('${a.ip}','${a.type}',this)">AI why?</button>
+        <span class="alert-time">${(a.ts || '').substring(11, 19)}</span>
+      </div>
     </div>
-    <div class="alert-message"><b>What happened:</b> ${a.message||''}</div>
-    <div class="alert-why"><b>Why this is ${sc}:</b> ${exp.why}</div>
-    <div class="alert-action ${sc}">${actionIcon}: ${exp.action}</div>
-    ${details?`<div class="alert-details">${details}</div>`:''}
+    <div class="alert-message"><span class="alert-label">What happened</span><p>${a.message || ''}</p></div>
+    <div class="alert-reason-grid">
+      <div class="alert-why"><span class="alert-label">Why this matters</span><p>${exp.why}</p></div>
+      <div class="alert-action-box ${sc}"><span class="alert-label">${actionIcon}</span><p>${exp.action}</p></div>
+    </div>
+    ${details ? `<div class="alert-details">${details}</div>` : ''}
+    <div id="ai-alert-${a.ip}-${a.type}" style="display:none"></div>
   </div>`;
-}
-async function loadDeviations(sev=null){
-  document.getElementById('dev-status').textContent='Loading…';
-  const url=sev?`${API}/alerts?severity=${sev}&limit=500`:`${API}/alerts?limit=500`;
-  const r=await get(url); if(!r)return;
-  document.getElementById('dev-total').textContent=r.total+' total';
-  document.getElementById('dev-status').textContent=r.alerts.length+' shown';
-  const byIP={};
-  r.alerts.forEach(a=>{byIP[a.ip]=byIP[a.ip]||[]; byIP[a.ip].push(a);});
-  const sorted=Object.entries(byIP).sort((a,b)=>b[1].length-a[1].length);
-  document.getElementById('dev-ip-count').textContent=sorted.length+' IPs';
-  document.getElementById('dev-ip-chips').innerHTML=sorted.length
-    ?sorted.map(([ip,als])=>{
-        const hasCrit=als.some(a=>a.severity==='critical');
-        return `<span class="ip-chip" style="${hasCrit?'':'background:rgba(227,179,65,.12);color:var(--warn)'}" onclick="goTrail('${ip}')" title="${als.length} alerts">${ip} (${als.length})</span>`;
-      }).join('')
-    :'<span style="color:var(--muted);font-size:12px">No deviations yet — build baselines first</span>';
-  const typeCounts={};
-  r.alerts.forEach(a=>{const t=a.type||'unknown'; typeCounts[t]=(typeCounts[t]||0)+1;});
-  if(Object.keys(typeCounts).length){
-    const entries=Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
-    bar('ch-devbar',entries.map(e=>e[0].replace(/_/g,' ')),entries.map(e=>e[1]),'#e3b341',true);
-  }
-  document.getElementById('dev-list').innerHTML=r.alerts.length
-    ?r.alerts.map(a=>renderAlert(a,true)).join('')
-    :'<div class="empty">No deviation alerts found. Upload logs → Build baselines → Check here.</div>';
-}
-async function buildAllBaselines(){
-  document.getElementById('dev-status').textContent='Building baselines…';
-  document.getElementById('qa-status').textContent='Building baselines…';
-  const r=await post(`${API}/baseline/build-all`);
-  if(r){
-    toast(`Built ${r.baselines_built} baselines`,'ok');
-    document.getElementById('dev-status').textContent=`Done — ${r.baselines_built} baselines built`;
-    document.getElementById('qa-status').textContent=`Done — ${r.baselines_built} baselines`;
-    await loadDeviations();
-  }
-}
-async function exploreBaseline(){
-  const ip=document.getElementById('bsl-ip').value.trim(); if(!ip)return;
-  curIP=ip;
-  const [bsl,alr]=await Promise.all([get(`${API}/baseline/${ip}`),get(`${API}/alerts/${ip}`)]);
-  document.getElementById('bsl-explorer-panel').style.display='block';
-  const alerts=alr&&alr.alerts?alr.alerts:[];
-  document.getElementById('bx-alerts').textContent=alerts.length;
-  if(bsl&&bsl.found){
-    const b=bsl.baseline;
-    document.getElementById('bx-events').textContent=b.event_count||0;
-    document.getElementById('bx-daily').textContent=b.avg_daily_events||0;
-    const hrs=Array.from({length:24},(_,i)=>({h:i,c:parseInt(b.usual_hours&&b.usual_hours[String(i)]||0)}));
-    bar('ch-hours',hrs.map(x=>x.h+':00'),hrs.map(x=>x.c),'#58a6ff');
-    const pts=Object.entries(b.usual_ports||{}).sort((a,c)=>c[1]-a[1]).slice(0,10);
-    if(pts.length) bar('ch-ports',pts.map(p=>p[0]),pts.map(p=>p[1]),'#e3b341',true);
-    document.getElementById('bx-profile').innerHTML=`
-      <b>IP:</b> ${ip} &nbsp;|&nbsp; <b>Built:</b> ${(b.built_at||'').substring(0,19).replace('T',' ')} &nbsp;|&nbsp; <b>Events:</b> ${b.event_count}<br>
+    }
+    async function aiExplainAlert(ip, alertType, btn) {
+      const box = document.getElementById(`ai-alert-${ip}-${alertType}`);
+      if (!box) return;
+      box.style.display = 'block';
+      box.innerHTML = '<div class="ai-inline"><div class="ai-loading"><div class="ai-spin"></div>AI is explaining this alert…</div></div>';
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = 'Loading';
+      const r = await get(`${API}/explain/alert/${ip}/${alertType}`);
+      if (!r) {
+        box.innerHTML = '<div class="ai-inline" style="color:var(--danger)">AI unavailable. Check the AI key in .env and restart backend.</div>';
+        btn.disabled = false;
+        btn.textContent = old;
+        return;
+      }
+      box.innerHTML = `<div class="ai-inline"><b style="color:var(--ai)">AI:</b>${formatAIText(r.explanation)}</div>`;
+      btn.textContent = 'Done';
+    }
+    async function loadDeviations(sev = null) {
+      document.getElementById('dev-status').textContent = 'Loading…';
+      const url = sev ? `${API}/alerts?severity=${sev}&limit=500` : `${API}/alerts?limit=500`;
+      const r = await get(url); if (!r) return;
+      document.getElementById('dev-total').textContent = r.total + ' total';
+      document.getElementById('dev-status').textContent = r.alerts.length + ' shown';
+      const byIP = {};
+      r.alerts.forEach(a => { byIP[a.ip] = byIP[a.ip] || []; byIP[a.ip].push(a); });
+      const sorted = Object.entries(byIP).sort((a, b) => b[1].length - a[1].length);
+      const sevRank = { critical: 4, high: 3, medium: 2, low: 1 };
+      document.getElementById('dev-ip-count').textContent = sorted.length + ' IPs';
+      document.getElementById('dev-ip-chips').innerHTML = sorted.length
+        ? `<div class="dev-chip-grid">${sorted.map(([ip, als]) => {
+          const topSeverity = als.map(a => a.severity || 'low').sort((a, b) => (sevRank[b] || 0) - (sevRank[a] || 0))[0] || 'low';
+          const typeCounts = {};
+          als.forEach(a => { const t = a.type || 'unknown'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
+          const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
+          return `<button class="ip-chip dev-ip-card ${topSeverity}" onclick="goTrail('${ip}')" title="${als.length} deviation alerts for ${ip}">
+            <span class="dev-chip-ip">${ip}</span>
+            <span class="dev-chip-meta">${als.length} alerts · ${topType.replace(/_/g, ' ')}</span>
+            <span class="dev-chip-sev">${topSeverity}</span>
+          </button>`;
+        }).join('')}</div>`
+        : '<span style="color:var(--muted);font-size:12px">No deviations yet — build baselines first</span>';
+      const typeCounts = {};
+      r.alerts.forEach(a => { const t = a.type || 'unknown'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
+      if (Object.keys(typeCounts).length) {
+        const entries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
+        bar('ch-devbar', entries.map(e => e[0].replace(/_/g, ' ')), entries.map(e => e[1]), '#e3b341', true);
+      }
+      document.getElementById('dev-list').innerHTML = r.alerts.length
+        ? r.alerts.map(a => renderAlert(a, true)).join('')
+        : '<div class="empty">No deviation alerts found. Upload logs → Build baselines → Check here.</div>';
+    }
+    async function buildAllBaselines() {
+      document.getElementById('dev-status').textContent = 'Building baselines…';
+      document.getElementById('qa-status').textContent = 'Building baselines…';
+      const r = await post(`${API}/baseline/build-all`);
+      if (r) {
+        toast(`Built ${r.baselines_built} baselines`, 'ok');
+        document.getElementById('dev-status').textContent = `Done — ${r.baselines_built} baselines built`;
+        document.getElementById('qa-status').textContent = `Done — ${r.baselines_built} baselines`;
+        await loadDeviations();
+      }
+    }
+    async function exploreBaseline() {
+      const ip = document.getElementById('bsl-ip').value.trim(); if (!ip) return;
+      curIP = ip;
+      const [bsl, alr] = await Promise.all([get(`${API}/baseline/${ip}`), get(`${API}/alerts/${ip}`)]);
+      document.getElementById('bsl-explorer-panel').style.display = 'block';
+      const alerts = alr && alr.alerts ? alr.alerts : [];
+      document.getElementById('bx-alerts').textContent = alerts.length;
+      if (bsl && bsl.found) {
+        const b = bsl.baseline;
+        document.getElementById('bx-events').textContent = b.event_count || 0;
+        document.getElementById('bx-daily').textContent = b.avg_daily_events || 0;
+        const hrs = Array.from({ length: 24 }, (_, i) => ({ h: i, c: parseInt(b.usual_hours && b.usual_hours[String(i)] || 0) }));
+        bar('ch-hours', hrs.map(x => x.h + ':00'), hrs.map(x => x.c), '#58a6ff');
+        const pts = Object.entries(b.usual_ports || {}).sort((a, c) => c[1] - a[1]).slice(0, 10);
+        if (pts.length) bar('ch-ports', pts.map(p => p[0]), pts.map(p => p[1]), '#e3b341', true);
+        document.getElementById('bx-profile').innerHTML = `
+      <b>IP:</b> ${ip} &nbsp;|&nbsp; <b>Built:</b> ${(b.built_at || '').substring(0, 19).replace('T', ' ')} &nbsp;|&nbsp; <b>Events:</b> ${b.event_count}<br>
       <b>Avg daily:</b> ${b.avg_daily_events}/day &nbsp;|&nbsp; <b>Avg severity score:</b> ${b.avg_severity_score} (1=low 4=critical)<br>
       <b>Login failures:</b> ${b.total_failures} &nbsp;|&nbsp; <b>Login successes:</b> ${b.total_successes}<br>
-      <b>Countries seen:</b> ${Object.keys(b.usual_countries||{}).join(', ')||'none'}<br>
-      <b>Usual ports:</b> ${Object.keys(b.usual_ports||{}).slice(0,10).join(', ')||'none'}<br>
-      <b>Active hours (UTC):</b> ${Object.keys(b.usual_hours||{}).sort((a,c)=>+a-+c).map(h=>h.padStart(2,'0')+':00').join(', ')||'none'}<br>
-      <b>Weekdays active:</b> ${Object.keys(b.usual_weekdays||{}).map(d=>['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][+d]).join(', ')||'none'}<br>
-      <b>Threat types baseline:</b> ${Object.keys(b.usual_rule_groups||{}).map(k=>k.replace(/_/g,' ')).join(', ')||'none'}`;
-  } else {
-    document.getElementById('bx-events').textContent='0';
-    document.getElementById('bx-daily').textContent='0';
-    document.getElementById('bx-profile').innerHTML='<span style="color:var(--warn)">No baseline yet for this IP. Needs 10+ events. Click Force rebuild.</span>';
-  }
-  document.getElementById('bx-alerts-list').innerHTML=alerts.length
-    ?alerts.map(a=>renderAlert(a,false)).join('')
-    :'<div class="empty">No deviation alerts for this IP</div>';
-}
-async function forceRebuild(){
-  const ip=document.getElementById('bsl-ip').value.trim(); if(!ip)return;
-  const r=await post(`${API}/baseline/${ip}/build`);
-  if(r){toast(r.status==='built'?'Baseline rebuilt for '+ip:'Not enough data','ok'); await exploreBaseline();}
-}
-async function trainModel(){
-  document.getElementById('train-status').textContent='Training…';
-  const r=await post(`${ML}/train`);
-  if(r){document.getElementById('train-status').textContent=`Trained on ${r.ip_count} IPs · ${r.anomalies} anomalies`; toast('Model trained!','ok'); await loadAnomalies();}
-}
-async function trainModelQuick(){
-  document.getElementById('qa-status').textContent='Training model…';
-  const r=await post(`${ML}/train`);
-  if(r){document.getElementById('qa-status').textContent=`Model trained — ${r.anomalies} anomalies found`; toast('Model trained!','ok');}
-}
+      <b>Countries seen:</b> ${Object.keys(b.usual_countries || {}).join(', ') || 'none'}<br>
+      <b>Usual ports:</b> ${Object.keys(b.usual_ports || {}).slice(0, 10).join(', ') || 'none'}<br>
+      <b>Active hours (UTC):</b> ${Object.keys(b.usual_hours || {}).sort((a, c) => +a - +c).map(h => h.padStart(2, '0') + ':00').join(', ') || 'none'}<br>
+      <b>Weekdays active:</b> ${Object.keys(b.usual_weekdays || {}).map(d => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][+d]).join(', ') || 'none'}<br>
+      <b>Threat types baseline:</b> ${Object.keys(b.usual_rule_groups || {}).map(k => k.replace(/_/g, ' ')).join(', ') || 'none'}`;
+      } else {
+        document.getElementById('bx-events').textContent = '0';
+        document.getElementById('bx-daily').textContent = '0';
+        document.getElementById('bx-profile').innerHTML = '<span style="color:var(--warn)">No baseline yet for this IP. Needs 10+ events. Click Force rebuild.</span>';
+      }
+      document.getElementById('bx-alerts-list').innerHTML = alerts.length
+        ? alerts.map(a => renderAlert(a, false)).join('')
+        : '<div class="empty">No deviation alerts for this IP</div>';
+    }
+    async function forceRebuild() {
+      const ip = document.getElementById('bsl-ip').value.trim(); if (!ip) return;
+      const r = await post(`${API}/baseline/${ip}/build`);
+      if (r) { toast(r.status === 'built' ? 'Baseline rebuilt for ' + ip : 'Not enough data', 'ok'); await exploreBaseline(); }
+    }
+    async function aiFullInvestigate() {
+      const ip = document.getElementById('ai-ip-input').value.trim(); if (!ip) return;
+      curIP = ip;
+      const panel = document.getElementById('ai-investigate-panel');
+      const body = document.getElementById('ai-inv-body');
+      panel.style.display = 'block';
+      document.getElementById('ai-inv-title').textContent = 'Full investigation — ' + ip;
+      document.getElementById('ai-inv-model').textContent = '';
+      aiLoading(body);
+      const r = await get(`${API}/explain/${ip}`);
+      if (!r) { body.innerHTML = '<span style="color:var(--danger)">AI unavailable. Check the AI key in .env and restart backend.</span>'; return; }
+      document.getElementById('ai-inv-model').textContent = (r.model || 'AI model') + ' · ' + String(r.generated_at || '').substring(0, 19);
+      body.innerHTML = `${formatAIText(r.explanation)}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn" onclick="goTrail('${ip}')">View trail</button>
+      <button class="btn ai" onclick="aiMLExplainFor('${ip}')">Explain ML score</button>
+      <button class="btn red" onclick="blockIPDirect('${ip}')">Block IP</button>
+    </div>`;
+      toast('AI investigation ready', 'ai');
+    }
+    async function aiMLExplain() {
+      const ip = document.getElementById('ai-ip-input').value.trim(); if (!ip) return;
+      await aiMLExplainFor(ip);
+    }
+    async function aiMLExplainFromInput() {
+      const ip = document.getElementById('ml-ip').value.trim(); if (!ip) return;
+      await aiMLExplainFor(ip);
+    }
+    async function aiMLExplainFor(ip) {
+      nav('aiinvestigate');
+      document.getElementById('ai-ip-input').value = ip;
+      const panel = document.getElementById('ai-investigate-panel');
+      const body = document.getElementById('ai-inv-body');
+      panel.style.display = 'block';
+      document.getElementById('ai-inv-title').textContent = 'ML explanation — ' + ip;
+      document.getElementById('ai-inv-model').textContent = '';
+      aiLoading(body);
+      const r = await get(`${API}/explain/ml/${ip}`);
+      if (!r) {
+        body.innerHTML = '<span style="color:var(--warn)">No AI ML explanation available yet. Score or train the ML model first, and make sure the AI key is configured.</span>';
+        return;
+      }
+      document.getElementById('ai-inv-model').textContent = (r.model || 'AI model') + ' · ' + String(r.generated_at || '').substring(0, 19);
+      body.innerHTML = formatAIText(r.explanation);
+      toast('AI ML explanation ready', 'ai');
+    }
+    async function aiAnalysePattern() {
+      const text = document.getElementById('ai-pattern-input').value.trim(); if (!text) return;
+      const panel = document.getElementById('ai-investigate-panel');
+      const body = document.getElementById('ai-inv-body');
+      panel.style.display = 'block';
+      document.getElementById('ai-inv-title').textContent = 'Pattern analysis';
+      document.getElementById('ai-inv-model').textContent = '';
+      aiLoading(body);
+      let data = { raw: text };
+      try { data = JSON.parse(text); } catch (e) { }
+      const r = await post(`${API}/explain/pattern`, { data, context: 'Submitted from CyberSentinel AI Investigator' });
+      if (!r) { body.innerHTML = '<span style="color:var(--danger)">AI unavailable. Check the AI key in .env and restart backend.</span>'; return; }
+      document.getElementById('ai-inv-model').textContent = (r.model || 'AI model') + ' · ' + String(r.generated_at || '').substring(0, 19);
+      body.innerHTML = formatAIText(r.explanation);
+      toast('Pattern analysis ready', 'ai');
+    }
+    async function blockIPDirect(ip) {
+      await post(`${API}/blocklist/add`, { ip });
+      toast(ip + ' blocked', 'ok');
+    }
+    async function trainModel() {
+      document.getElementById('train-status').textContent = 'Training…';
+      const r = await post(`${ML}/train`);
+      if (r) { document.getElementById('train-status').textContent = `Trained on ${r.ip_count} IPs · ${r.anomalies} anomalies`; toast('Model trained!', 'ok'); await loadAnomalies(); }
+    }
+    async function trainModelQuick() {
+      document.getElementById('qa-status').textContent = 'Training model…';
+      const r = await post(`${ML}/train`);
+      if (r) { document.getElementById('qa-status').textContent = `Model trained — ${r.anomalies} anomalies found`; toast('Model trained!', 'ok'); }
+    }
 
-function mlRiskLabel(risk) {
-  if (risk > 70) return 'critical';
-  if (risk > 40) return 'high';
-  return 'medium';
-}
-function confidenceLabel(score) {
-  if (score >= 75) return 'High';
-  if (score >= 45) return 'Medium';
-  return 'Low';
-}
-function confidenceColor(score) {
-  if (score >= 75) return 'var(--ok)';
-  if (score >= 45) return 'var(--warn)';
-  return 'var(--danger)';
-}
-function computeConfidence(r) {
-  const f = r.features || {};
-  let score = 15;
-  score += Math.min(30, Math.log10((Number(f.n_events || 0)) + 1) * 12);
-  if (r.anomaly_score !== null && r.anomaly_score !== undefined) score += 15;
-  if (Number(f.baseline_alerts || 0) > 0) score += 12;
-  if (Number(f.critical_alerts || 0) > 0) score += 12;
-  if ((Number(f.brute_force_cnt || 0) + Number(f.ssh_bf_cnt || 0) + Number(f.vpn_bf_cnt || 0)) > 0) score += 10;
-  if ((Number(f.rdp_cnt || 0) + Number(f.db_scan_cnt || 0) + Number(f.priv_esc_cnt || 0) + Number(f.known_bad_cnt || 0)) > 0) score += 10;
-  if (Number(f.unique_dst_ips || 0) > 3 || Number(f.unique_dst_ports || 0) > 3) score += 6;
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-function explainMLScore(r) {
-  const f = r.features || {};
-  const risk = Number(r.risk_score || 0);
-  const confidence = computeConfidence(r);
-  const score = typeof r.anomaly_score === 'number' ? r.anomaly_score : null;
-  const baselineBoost = (Number(f.baseline_alerts || 0) * 2) + (Number(f.critical_alerts || 0) * 5);
-  const baseRisk = Math.max(0, Math.min(100, risk - baselineBoost));
-  const rawRisk = score === null ? null : Math.max(0, Math.min(100, Math.trunc((1 - (score + 0.5)) * 100)));
-  const scorePosition = score === null ? 'not available' : score < -0.1 ? 'well below the anomaly boundary' : score < 0 ? 'just below the anomaly boundary' : 'above the anomaly boundary';
-  const mainReasons = [];
-  const drivers = [];
+    function mlRiskLabel(risk) {
+      if (risk > 70) return 'critical';
+      if (risk > 40) return 'high';
+      return 'medium';
+    }
+    function confidenceLabel(score) {
+      if (score >= 75) return 'High';
+      if (score >= 45) return 'Medium';
+      return 'Low';
+    }
+    function confidenceColor(score) {
+      if (score >= 75) return 'var(--ok)';
+      if (score >= 45) return 'var(--warn)';
+      return 'var(--danger)';
+    }
+    function computeConfidence(r) {
+      const f = r.features || {};
+      let score = 15;
+      score += Math.min(30, Math.log10((Number(f.n_events || 0)) + 1) * 12);
+      if (r.anomaly_score !== null && r.anomaly_score !== undefined) score += 15;
+      if (Number(f.baseline_alerts || 0) > 0) score += 12;
+      if (Number(f.critical_alerts || 0) > 0) score += 12;
+      if ((Number(f.brute_force_cnt || 0) + Number(f.ssh_bf_cnt || 0) + Number(f.vpn_bf_cnt || 0)) > 0) score += 10;
+      if ((Number(f.rdp_cnt || 0) + Number(f.db_scan_cnt || 0) + Number(f.priv_esc_cnt || 0) + Number(f.known_bad_cnt || 0)) > 0) score += 10;
+      if (Number(f.unique_dst_ips || 0) > 3 || Number(f.unique_dst_ports || 0) > 3) score += 6;
+      return Math.max(0, Math.min(100, Math.round(score)));
+    }
+    function explainMLScore(r) {
+      const f = r.features || {};
+      const risk = Number(r.risk_score || 0);
+      const confidence = computeConfidence(r);
+      const score = typeof r.anomaly_score === 'number' ? r.anomaly_score : null;
+      const baselineBoost = (Number(f.baseline_alerts || 0) * 2) + (Number(f.critical_alerts || 0) * 5);
+      const baseRisk = Math.max(0, Math.min(100, risk - baselineBoost));
+      const rawRisk = score === null ? null : Math.max(0, Math.min(100, Math.trunc((1 - (score + 0.5)) * 100)));
+      const scorePosition = score === null ? 'not available' : score < -0.1 ? 'well below the anomaly boundary' : score < 0 ? 'just below the anomaly boundary' : 'above the anomaly boundary';
+      const mainReasons = [];
+      const drivers = [];
 
-  if (r.is_anomaly) {
-    mainReasons.push('Isolation Forest returned anomaly=YES because this IP sits outside the normal cluster of trained IP behaviour.');
-    drivers.push({level:'critical', text:`<b>Model decision:</b> anomaly=YES. This means the IP was separated from normal IPs by the Isolation Forest trees.`});
-  } else {
-    mainReasons.push('Isolation Forest did not mark it as a hard anomaly, so the risk mainly comes from rule/baseline context.');
-    drivers.push({level:'medium', text:`<b>Model decision:</b> anomaly=NO. Any risk here mainly comes from baseline or threat feature context.`});
-  }
-  if (score !== null) {
-    mainReasons.push(`Raw anomaly score is ${score}, which is ${scorePosition}; lower than 0 means suspicious.`);
-    drivers.push({level:score < -0.1 ? 'critical' : score < 0 ? 'high' : 'medium', text:`<b>Anomaly score:</b> ${score}. Boundary is around 0. Negative means outlier; positive means more normal. This score produced base risk ${rawRisk}.`});
-  }
-  if (f.baseline_alerts > 0 || f.critical_alerts > 0) {
-    mainReasons.push(`Baseline added ${baselineBoost} points because it has ${f.baseline_alerts || 0} deviation alerts and ${f.critical_alerts || 0} critical deviations.`);
-    drivers.push({level:f.critical_alerts > 0 ? 'critical' : 'high', text:`<b>Baseline boost added ${baselineBoost} risk points.</b> ${f.baseline_alerts || 0} behavioural deviations and ${f.critical_alerts || 0} critical deviations were seen for this IP.`});
-  }
-  if (f.n_events > 500 || f.event_rate_pm > 1) {
-    mainReasons.push(`Event volume is abnormal: ${f.n_events || 0} events at ${f.event_rate_pm || 0}/min.`);
-    drivers.push({level:'high', text:`<b>High activity volume.</b> ${f.n_events || 0} events at ${f.event_rate_pm || 0}/min can indicate scanning, brute force, or automated tooling.`});
-  }
-  if (f.unique_dst_ips > 10 || f.unique_dst_ports > 5) {
-    mainReasons.push(`Target spread is wide: ${f.unique_dst_ips || 0} destination IPs and ${f.unique_dst_ports || 0} destination ports.`);
-    drivers.push({level:'high', text:`<b>Wide target spread.</b> It touched ${f.unique_dst_ips || 0} destination IPs and ${f.unique_dst_ports || 0} ports, which can look like reconnaissance or lateral movement.`});
-  }
-  if (f.brute_force_cnt || f.ssh_bf_cnt || f.vpn_bf_cnt) {
-    mainReasons.push(`Credential attack features are present: ${f.brute_force_cnt || 0} brute-force events.`);
-    drivers.push({level:'critical', text:`<b>Credential attack signals:</b> ${f.brute_force_cnt || 0} brute-force, ${f.ssh_bf_cnt || 0} SSH brute-force, ${f.vpn_bf_cnt || 0} VPN brute-force events.`});
-  }
-  if (f.rdp_cnt || f.db_scan_cnt || f.priv_esc_cnt) {
-    mainReasons.push(`High-value technique features are present: RDP ${f.rdp_cnt || 0}, DB scan ${f.db_scan_cnt || 0}, privilege escalation ${f.priv_esc_cnt || 0}.`);
-    drivers.push({level:'high', text:`<b>High-value technique signals.</b> RDP relay ${f.rdp_cnt || 0}, DB scan ${f.db_scan_cnt || 0}, privilege escalation ${f.priv_esc_cnt || 0}.`});
-  }
-  if (f.known_bad_cnt) {
-    mainReasons.push(`${f.known_bad_cnt} known-malicious events are included in the feature vector.`);
-    drivers.push({level:'critical', text:`<b>Known malicious activity.</b> ${f.known_bad_cnt} known-bad events are included in the feature vector.`});
-  }
-  if (f.pct_critical > 0 || f.pct_high > 0.25) {
-    mainReasons.push(`Severity mix is unusual: ${(Number(f.pct_high || 0) * 100).toFixed(0)}% high severity and ${(Number(f.pct_critical || 0) * 100).toFixed(0)}% critical.`);
-    drivers.push({level:'high', text:`<b>Severity mix is elevated:</b> ${(Number(f.pct_high || 0) * 100).toFixed(0)}% high severity, ${(Number(f.pct_critical || 0) * 100).toFixed(0)}% critical severity.`});
-  }
-  if (drivers.length === 1) {
-    mainReasons.push('No single loud feature dominated; the score came from the combined feature vector compared with other IPs.');
-    drivers.push({level:'medium', text:`<b>No single loud driver dominated.</b> The score came from the combined feature vector after scaling and comparison against other IPs.`});
-  }
-  const finalReason = mainReasons.slice(0, 4).join(' ');
-  const confidenceReason = confidence < 45 ? 'Confidence is low because the model has limited supporting evidence, usually too few events or few corroborating signals.' :
-    confidence < 75 ? 'Confidence is medium because there is useful evidence, but not enough volume or corroboration for full trust.' :
-    'Confidence is high because enough events and multiple signals support the score.';
-  const verdict = risk > 70 ? 'Critical because the base anomaly score plus baseline/security features crossed the critical threshold.' :
-    risk > 40 ? 'High because the IP is anomalous, but the final score stayed below the critical threshold.' :
-    'Medium because the model saw some unusual behaviour, but not enough supporting signals for high/critical.';
+      if (r.is_anomaly) {
+        mainReasons.push('Isolation Forest returned anomaly=YES because this IP sits outside the normal cluster of trained IP behaviour.');
+        drivers.push({ level: 'critical', text: `<b>Model decision:</b> anomaly=YES. This means the IP was separated from normal IPs by the Isolation Forest trees.` });
+      } else {
+        mainReasons.push('Isolation Forest did not mark it as a hard anomaly, so the risk mainly comes from rule/baseline context.');
+        drivers.push({ level: 'medium', text: `<b>Model decision:</b> anomaly=NO. Any risk here mainly comes from baseline or threat feature context.` });
+      }
+      if (score !== null) {
+        mainReasons.push(`Raw anomaly score is ${score}, which is ${scorePosition}; lower than 0 means suspicious.`);
+        drivers.push({ level: score < -0.1 ? 'critical' : score < 0 ? 'high' : 'medium', text: `<b>Anomaly score:</b> ${score}. Boundary is around 0. Negative means outlier; positive means more normal. This score produced base risk ${rawRisk}.` });
+      }
+      if (f.baseline_alerts > 0 || f.critical_alerts > 0) {
+        mainReasons.push(`Baseline added ${baselineBoost} points because it has ${f.baseline_alerts || 0} deviation alerts and ${f.critical_alerts || 0} critical deviations.`);
+        drivers.push({ level: f.critical_alerts > 0 ? 'critical' : 'high', text: `<b>Baseline boost added ${baselineBoost} risk points.</b> ${f.baseline_alerts || 0} behavioural deviations and ${f.critical_alerts || 0} critical deviations were seen for this IP.` });
+      }
+      if (f.n_events > 500 || f.event_rate_pm > 1) {
+        mainReasons.push(`Event volume is abnormal: ${f.n_events || 0} events at ${f.event_rate_pm || 0}/min.`);
+        drivers.push({ level: 'high', text: `<b>High activity volume.</b> ${f.n_events || 0} events at ${f.event_rate_pm || 0}/min can indicate scanning, brute force, or automated tooling.` });
+      }
+      if (f.unique_dst_ips > 10 || f.unique_dst_ports > 5) {
+        mainReasons.push(`Target spread is wide: ${f.unique_dst_ips || 0} destination IPs and ${f.unique_dst_ports || 0} destination ports.`);
+        drivers.push({ level: 'high', text: `<b>Wide target spread.</b> It touched ${f.unique_dst_ips || 0} destination IPs and ${f.unique_dst_ports || 0} ports, which can look like reconnaissance or lateral movement.` });
+      }
+      if (f.brute_force_cnt || f.ssh_bf_cnt || f.vpn_bf_cnt) {
+        mainReasons.push(`Credential attack features are present: ${f.brute_force_cnt || 0} brute-force events.`);
+        drivers.push({ level: 'critical', text: `<b>Credential attack signals:</b> ${f.brute_force_cnt || 0} brute-force, ${f.ssh_bf_cnt || 0} SSH brute-force, ${f.vpn_bf_cnt || 0} VPN brute-force events.` });
+      }
+      if (f.rdp_cnt || f.db_scan_cnt || f.priv_esc_cnt) {
+        mainReasons.push(`High-value technique features are present: RDP ${f.rdp_cnt || 0}, DB scan ${f.db_scan_cnt || 0}, privilege escalation ${f.priv_esc_cnt || 0}.`);
+        drivers.push({ level: 'high', text: `<b>High-value technique signals.</b> RDP relay ${f.rdp_cnt || 0}, DB scan ${f.db_scan_cnt || 0}, privilege escalation ${f.priv_esc_cnt || 0}.` });
+      }
+      if (f.known_bad_cnt) {
+        mainReasons.push(`${f.known_bad_cnt} known-malicious events are included in the feature vector.`);
+        drivers.push({ level: 'critical', text: `<b>Known malicious activity.</b> ${f.known_bad_cnt} known-bad events are included in the feature vector.` });
+      }
+      if (f.pct_critical > 0 || f.pct_high > 0.25) {
+        mainReasons.push(`Severity mix is unusual: ${(Number(f.pct_high || 0) * 100).toFixed(0)}% high severity and ${(Number(f.pct_critical || 0) * 100).toFixed(0)}% critical.`);
+        drivers.push({ level: 'high', text: `<b>Severity mix is elevated:</b> ${(Number(f.pct_high || 0) * 100).toFixed(0)}% high severity, ${(Number(f.pct_critical || 0) * 100).toFixed(0)}% critical severity.` });
+      }
+      if (drivers.length === 1) {
+        mainReasons.push('No single loud feature dominated; the score came from the combined feature vector compared with other IPs.');
+        drivers.push({ level: 'medium', text: `<b>No single loud driver dominated.</b> The score came from the combined feature vector after scaling and comparison against other IPs.` });
+      }
+      const finalReason = mainReasons.slice(0, 4).join(' ');
+      const confidenceReason = confidence < 45 ? 'Confidence is low because the model has limited supporting evidence, usually too few events or few corroborating signals.' :
+        confidence < 75 ? 'Confidence is medium because there is useful evidence, but not enough volume or corroboration for full trust.' :
+          'Confidence is high because enough events and multiple signals support the score.';
+      const verdict = risk > 70 ? 'Critical because the base anomaly score plus baseline/security features crossed the critical threshold.' :
+        risk > 40 ? 'High because the IP is anomalous, but the final score stayed below the critical threshold.' :
+          'Medium because the model saw some unusual behaviour, but not enough supporting signals for high/critical.';
 
-  return `<div class="ml-explain">
+      return `<div class="ml-explain">
     <div class="ml-explain-title">Actual reason this IP got ${risk}/100 (${mlRiskLabel(risk)})</div>
     <p><b>Short answer:</b> ${finalReason}</p>
     <p><b>Verdict:</b> ${verdict}</p>
     <p><b>Confidence:</b> ${confidence}/100 (${confidenceLabel(confidence)}). ${confidenceReason}</p>
     <div class="ml-formula">calculation: anomaly_score ${score ?? 'n/a'} → base_risk ${baseRisk}; baseline boost ${baselineBoost}; final risk ${risk}/100</div>
-    <div class="ml-driver-list">${drivers.map(d=>`<div class="ml-driver ${d.level}">${d.text}</div>`).join('')}</div>
+    <div class="ml-driver-list">${drivers.map(d => `<div class="ml-driver ${d.level}">${d.text}</div>`).join('')}</div>
   </div>`;
-}
-function openMLScore(ip) {
-  nav('ml');
-  document.getElementById('ml-ip').value = ip;
-  scoreIP(ip);
-}
-async function scoreIP(ipOverride=null){
-  const ip=ipOverride || document.getElementById('ml-ip').value.trim(); if(!ip)return;
-  document.getElementById('ml-ip').value = ip;
-  const r=await get(`${ML}/score/${ip}`); if(!r)return;
-  document.getElementById('score-panel').style.display='block';
-  const rc=r.risk_score>70?'var(--danger)':r.risk_score>40?'var(--warn)':'var(--ok)';
-  const conf = computeConfidence(r);
-  document.getElementById('score-body').innerHTML=`
+    }
+    function openMLScore(ip) {
+      nav('ml');
+      document.getElementById('ml-ip').value = ip;
+      scoreIP(ip);
+    }
+    async function scoreIP(ipOverride = null) {
+      const ip = ipOverride || document.getElementById('ml-ip').value.trim(); if (!ip) return;
+      document.getElementById('ml-ip').value = ip;
+      const r = await get(`${ML}/score/${ip}`); if (!r) return;
+      document.getElementById('score-panel').style.display = 'block';
+      const rc = r.risk_score > 70 ? 'var(--danger)' : r.risk_score > 40 ? 'var(--warn)' : 'var(--ok)';
+      const conf = computeConfidence(r);
+      document.getElementById('score-body').innerHTML = `
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px">
-      <div><div style="font-size:11px;color:var(--muted)">Risk score</div><div style="font-size:40px;font-weight:700;color:${rc}">${r.risk_score??'—'}/100</div></div>
-      <div><div style="font-size:11px;color:var(--muted)">Anomaly score</div><div style="font-size:28px;font-weight:700">${r.anomaly_score??'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Risk score</div><div style="font-size:40px;font-weight:700;color:${rc}">${r.risk_score ?? '—'}/100</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Anomaly score</div><div style="font-size:28px;font-weight:700">${r.anomaly_score ?? '—'}</div></div>
       <div><div style="font-size:11px;color:var(--muted)">Confidence</div><div style="font-size:28px;font-weight:700;color:${confidenceColor(conf)}">${conf}/100</div><div style="font-size:11px;color:var(--muted)">${confidenceLabel(conf)}</div></div>
-      <div><div style="font-size:11px;color:var(--muted)">Anomaly</div><div style="font-size:22px;font-weight:700;color:${r.is_anomaly?'var(--danger)':'var(--ok)'}">${r.is_anomaly?'YES':'No'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">Anomaly</div><div style="font-size:22px;font-weight:700;color:${r.is_anomaly ? 'var(--danger)' : 'var(--ok)'}">${r.is_anomaly ? 'YES' : 'No'}</div></div>
     </div>
-    ${r.features?`<div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:2.2">
+    ${r.features ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:2.2">
       Events: <b>${r.features.n_events}</b> &nbsp;|&nbsp;
       Rate: <b>${r.features.event_rate_pm}/min</b> &nbsp;|&nbsp;
       Unique dst IPs: <b>${r.features.unique_dst_ips}</b> &nbsp;|&nbsp;
@@ -937,82 +3143,129 @@ async function scoreIP(ipOverride=null){
       RDP: <b>${r.features.rdp_cnt}</b> &nbsp;|&nbsp;
       DB scans: <b>${r.features.db_scan_cnt}</b><br>
       <span style="color:var(--warn)">Baseline alerts: <b>${r.features.baseline_alerts}</b> &nbsp;|&nbsp; Critical alerts: <b>${r.features.critical_alerts}</b></span>
-    </div>`:''}
-    ${r.note?`<div style="margin-top:8px;color:var(--warn);font-size:12px">${r.note}</div>`:''}
-    ${r.anomaly_score!==undefined && r.risk_score!==undefined ? explainMLScore(r) : ''}`;
-}
-async function loadAnomalies(){
-  const r=await get(`${ML}/anomalies`); if(!r)return;
-  document.getElementById('anom-tbody').innerHTML=r.anomalies.length
-    ?r.anomalies.map(a=>`<tr onclick="openMLScore('${a.ip}')" style="cursor:pointer">
+    </div>`: ''}
+    ${r.note ? `<div style="margin-top:8px;color:var(--warn);font-size:12px">${r.note}</div>` : ''}
+    ${r.anomaly_score !== undefined && r.risk_score !== undefined ? explainMLScore(r) : ''}
+    <div style="margin-top:12px"><button class="btn ai" onclick="aiMLExplainFor('${ip}')">Ask AI why this score</button></div>`;
+    }
+    async function loadAnomalies() {
+      const r = await get(`${ML}/anomalies`); if (!r) return;
+      document.getElementById('anom-tbody').innerHTML = r.anomalies.length
+        ? r.anomalies.map(a => `<tr onclick="openMLScore('${a.ip}')" style="cursor:pointer">
       <td style="color:var(--accent)">${a.ip}</td>
-      <td><span style="color:${a.risk_score>70?'var(--danger)':a.risk_score>40?'var(--warn)':'var(--ok)'};font-weight:700">${a.risk_score??'—'}</span>/100</td>
-      <td style="color:var(--muted)">${a.anomaly_score??'—'}</td>
-      <td><span class="badge ${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}">${a.risk_score>70?'critical':a.risk_score>40?'high':'medium'}</span></td>
-      <td><button class="btn" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();openMLScore('${a.ip}')">Explain</button></td>
+      <td><span style="color:${a.risk_score > 70 ? 'var(--danger)' : a.risk_score > 40 ? 'var(--warn)' : 'var(--ok)'};font-weight:700">${a.risk_score ?? '—'}</span>/100</td>
+      <td style="color:var(--muted)">${a.anomaly_score ?? '—'}</td>
+      <td><span class="badge ${a.risk_score > 70 ? 'critical' : a.risk_score > 40 ? 'high' : 'medium'}">${a.risk_score > 70 ? 'critical' : a.risk_score > 40 ? 'high' : 'medium'}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn" style="font-size:10px;padding:3px 8px;margin-right:3px" onclick="event.stopPropagation();openMLScore('${a.ip}')">Explain</button>
+        <button class="btn ai" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();aiMLExplainFor('${a.ip}')">AI</button>
+      </td>
     </tr>`).join('')
-    :'<tr><td colspan="5" class="empty">Train the model first</td></tr>';
-}
-async function loadClusters(){
-  const r=await get(`${ML}/clusters`); if(!r)return;
-  if(!r.clusters.length){document.getElementById('clusters-body').innerHTML='<div class="card"><div class="cb empty">No clusters found</div></div>'; return;}
-  const max=Math.max(...r.clusters.map(c=>c.total_events));
-  document.getElementById('clusters-body').innerHTML=`<div class="card">
+        : '<tr><td colspan="5" class="empty">Train the model first</td></tr>';
+    }
+    async function loadClusters() {
+      const r = await get(`${ML}/clusters`); if (!r) return;
+      if (!r.clusters.length) { document.getElementById('clusters-body').innerHTML = '<div class="card"><div class="cb empty">No clusters found</div></div>'; return; }
+      const max = Math.max(...r.clusters.map(c => c.total_events));
+      document.getElementById('clusters-body').innerHTML = `<div class="card">
     <div class="ch"><span class="ct">Coordinated attack clusters</span><span style="font-size:11px;color:var(--muted)">${r.clusters.length} clusters</span></div>
-    <div class="cb">${r.clusters.map(c=>`
+    <div class="cb">${r.clusters.map(c => `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;background:var(--bg3);border-radius:6px;padding:12px">
         <div style="min-width:150px"><div style="font-family:var(--mono);font-size:13px;font-weight:600">${c.subnet}</div><div style="font-size:10px;color:var(--muted)">${c.ip_count} IPs</div></div>
-        <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px"><div style="height:100%;border-radius:3px;width:${Math.round(c.total_events/max*100)}%;background:${c.threat_level==='critical'?'var(--danger)':c.threat_level==='high'?'var(--warn)':'var(--accent)'}"></div></div>
+        <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px"><div style="height:100%;border-radius:3px;width:${Math.round(c.total_events / max * 100)}%;background:${c.threat_level === 'critical' ? 'var(--danger)' : c.threat_level === 'high' ? 'var(--warn)' : 'var(--accent)'}"></div></div>
         <div style="font-size:12px;color:var(--muted);min-width:80px;text-align:right">${c.total_events.toLocaleString()} events</div>
         <span class="badge ${c.threat_level}">${c.threat_level}</span>
       </div>
       <div style="padding:0 12px 10px;font-size:11px;color:var(--muted);font-family:var(--mono)">${c.ips.join(', ')}</div>`).join('')}
     </div></div>`;
-}
-async function loadBlocklist(){
-  const r=await get(`${API}/blocklist`); if(!r)return;
-  document.getElementById('bl-count').textContent=r.count+' IPs';
-  document.getElementById('bl-body').innerHTML=r.ips.length
-    ?r.ips.map(ip=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(48,54,61,.4)">
+    }
+    async function loadBlocklist() {
+      const r = await get(`${API}/blocklist`); if (!r) return;
+      document.getElementById('bl-count').textContent = r.count + ' IPs';
+      document.getElementById('bl-body').innerHTML = r.ips.length
+        ? r.ips.map(ip => `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(48,54,61,.4)">
         <span style="font-family:var(--mono);font-size:12px;flex:1">${ip}</span>
         <button class="btn" style="font-size:10px;padding:3px 8px" onclick="unblockIP('${ip}')">Unblock</button>
         <button class="btn" style="font-size:10px;padding:3px 8px" onclick="goTrail('${ip}')">Trail</button>
       </div>`).join('')
-    :'<span style="color:var(--muted);font-size:12px">No IPs blocked</span>';
-}
-async function manualBlock(){
-  const ip=document.getElementById('block-ip').value.trim(); if(!ip)return;
-  await post(`${API}/blocklist/add`,{ip});
-  toast(ip+' blocked','ok'); document.getElementById('block-ip').value=''; await loadBlocklist();
-}
-async function unblockIP(ip){await del(`${API}/blocklist/${ip}`); toast(ip+' unblocked','warn'); await loadBlocklist();}
-function dragOver(e){e.preventDefault(); document.getElementById('drop-zone').classList.add('drag');}
-function dragLeave(){document.getElementById('drop-zone').classList.remove('drag');}
-function dropFile(e){e.preventDefault(); dragLeave(); const f=e.dataTransfer.files[0]; if(f)uploadCSV(f);}
-async function uploadCSV(file){
-  if(!file)return;
-  const wrap=document.getElementById('prog-wrap'), bar=document.getElementById('prog-bar'), stat=document.getElementById('upload-status');
-  wrap.style.display='block'; bar.style.width='30%';
-  stat.textContent=`Uploading ${file.name} (${(file.size/1024).toFixed(0)} KB)…`;
-  const fd=new FormData(); fd.append('file',file); bar.style.width='60%';
-  const r=await postForm(`${API}/ingest/csv`,fd);
-  bar.style.width='100%';
-  if(r){
-    stat.textContent=`Ingesting ${r.rows.toLocaleString()} rows in background… (builds baselines automatically after)`;
-    toast(`Ingestion started: ${r.rows} rows`,'ok');
-    setTimeout(()=>{bar.style.width='0%'; wrap.style.display='none';},2000);
-    setTimeout(refreshAll,8000);
-  }
-}
-async function ingestJSON(){
-  const raw=document.getElementById('json-log').value.trim(); if(!raw)return;
-  try{
-    const r=await post(`${API}/ingest/log`,JSON.parse(raw));
-    if(r){toast('Log ingested','ok'); setTimeout(refreshAll,1000);}
-  }catch(e){toast('Invalid JSON: '+e.message,'err');}
-}
-refreshAll();
-setInterval(refreshAll,30000);
-</script>
+        : '<span style="color:var(--muted);font-size:12px">No IPs blocked</span>';
+    }
+    async function manualBlock() {
+      const ip = document.getElementById('block-ip').value.trim(); if (!ip) return;
+      await post(`${API}/blocklist/add`, { ip });
+      toast(ip + ' blocked', 'ok'); document.getElementById('block-ip').value = ''; await loadBlocklist();
+    }
+    async function unblockIP(ip) { await del(`${API}/blocklist/${ip}`); toast(ip + ' unblocked', 'warn'); await loadBlocklist(); }
+    function dragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
+    function dragLeave() { document.getElementById('drop-zone').classList.remove('drag'); }
+    function dropFile(e) { e.preventDefault(); dragLeave(); const f = e.dataTransfer.files[0]; if (f) uploadCSV(f); }
+    async function uploadCSV(file) {
+      if (!file) return;
+      const wrap = document.getElementById('prog-wrap'), bar = document.getElementById('prog-bar'), stat = document.getElementById('upload-status');
+      wrap.style.display = 'block'; bar.style.width = '30%';
+      stat.textContent = `Uploading ${file.name} (${(file.size / 1024).toFixed(0)} KB)…`;
+      const fd = new FormData(); fd.append('file', file); bar.style.width = '60%';
+      const r = await postForm(`${API}/ingest/csv`, fd);
+      bar.style.width = '100%';
+      if (r) {
+        stat.textContent = `Ingesting ${r.rows.toLocaleString()} rows in background… (builds baselines automatically after)`;
+        toast(`Ingestion started: ${r.rows} rows`, 'ok');
+        setTimeout(() => { bar.style.width = '0%'; wrap.style.display = 'none'; }, 2000);
+        setTimeout(refreshAll, 8000);
+      }
+    }
+    async function ingestJSON() {
+      const raw = document.getElementById('json-log').value.trim(); if (!raw) return;
+      try {
+        const r = await post(`${API}/ingest/log`, JSON.parse(raw));
+        if (r) { toast('Log ingested', 'ok'); setTimeout(refreshAll, 1000); }
+      } catch (e) { toast('Invalid JSON: ' + e.message, 'err'); }
+    }
+    // --- Premium UI micro-interactions ---
+    function animateValue(el, end, duration = 600) {
+      if (!el || isNaN(end)) return;
+      const start = parseInt(el.textContent.replace(/,/g, '')) || 0;
+      if (start === end) return;
+      const range = end - start;
+      const startTime = performance.now();
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(start + range * ease);
+        el.textContent = current.toLocaleString();
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    const _origRefresh = refreshAll;
+    refreshAll = async function () {
+      await _origRefresh();
+      ['m-total', 'm-ips', 'm-hot', 'm-balerts', 'm-crit', 'm-blocked'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { const v = parseInt(el.textContent.replace(/[^0-9]/g, '')) || 0; animateValue(el, v, 700); }
+      });
+    };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          entry.target.style.animationDelay = (i * 0.06) + 's';
+          entry.target.classList.add('fade-in-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.metric, .card, .cbox, .ops-chip, .alert-card, .bsl-box, .term').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(12px)';
+      observer.observe(el);
+    });
+    const fadeStyle = document.createElement('style');
+    fadeStyle.textContent = '.fade-in-visible { opacity: 1 !important; transform: translateY(0) !important; transition: opacity 0.45s cubic-bezier(0.4,0,0.2,1), transform 0.45s cubic-bezier(0.4,0,0.2,1); transition-delay: var(--delay, 0s); }';
+    document.head.appendChild(fadeStyle);
+    refreshAll();
+    setInterval(refreshAll, 30000);
+  </script>
 </body>
+
 </html>
