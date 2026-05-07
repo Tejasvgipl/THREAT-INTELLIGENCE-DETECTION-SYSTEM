@@ -405,17 +405,7 @@ body::before{
 }
 
 body::after{
-  content:""!important;
-  position:fixed!important;
-  inset:0!important;
-  pointer-events:none!important;
-  z-index:9999!important;
-  background:
-    linear-gradient(to bottom,transparent 0,rgba(255,255,255,.035) 50%,transparent 100%),
-    repeating-linear-gradient(to bottom,rgba(255,255,255,.018) 0 1px,transparent 1px 4px)!important;
-  mix-blend-mode:screen!important;
-  opacity:.28!important;
-  animation:scanlineSweep 5.8s linear infinite!important;
+  content:none!important;
 }
 
 @keyframes cyberGridDrift{
@@ -504,7 +494,8 @@ body::after{
 }
 
 .topbar{
-  border-bottom:1px solid rgba(92,210,255,.24)!important;
+  border-bottom:0!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.32),0 1px 0 rgba(92,210,255,.08)!important;
 }
 
 .topbar h1::before{
