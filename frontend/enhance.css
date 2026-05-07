@@ -426,17 +426,7 @@ body::after{
 }
 
 .main::before{
-  content:""!important;
-  position:fixed!important;
-  top:74px!important;
-  left:270px!important;
-  right:0!important;
-  height:1px!important;
-  background:linear-gradient(90deg,transparent,var(--cyber-cyan),var(--cyber-mint),transparent)!important;
-  box-shadow:0 0 24px rgba(92,210,255,.45)!important;
-  animation:topBeam 4.4s ease-in-out infinite!important;
-  pointer-events:none!important;
-  z-index:20!important;
+  content:none!important;
 }
 
 @keyframes topBeam{
