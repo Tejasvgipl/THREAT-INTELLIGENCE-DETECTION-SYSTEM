@@ -27,6 +27,11 @@ cybersentinel/
 │   ├── requirements.txt
 │   └── Dockerfile
 │
+├── ml-intern/                  ← Hybrid retraining governance service (FastAPI)
+│   ├── main.py                 ← Time + data + drift retraining checks
+│   ├── requirements.txt
+│   └── Dockerfile
+│
 ├── redis-config/               ← Redis with persistence
 │   ├── redis.conf
 │   └── Dockerfile
@@ -117,6 +122,29 @@ GET  /api/ml/clusters             Subnet clustering (coordinated attack groups)
 GET  /api/ml/health               Health + model status
 ```
 
+### ML Intern endpoints
+
+ML Intern is a separate service for model governance. It watches Redis, checks
+hybrid retraining conditions, creates candidate model versions, and waits for
+manual approval before a candidate becomes active.
+
+```
+GET  /api/ml-intern/health              Service health
+GET  /api/ml-intern/status              Scheduler, trigger, and active model state
+POST /api/ml-intern/retrain             Manual retraining trigger
+GET  /api/ml-intern/models              All model versions and statuses
+POST /api/ml-intern/approve-model/{id}  Promote candidate model to active
+POST /api/ml-intern/rollback            Revert to previous approved model
+GET  /api/ml-intern/reports/latest      Latest training report
+```
+
+Hybrid retraining checks run every few minutes. Retraining starts if **any**
+condition is true:
+
+- 24 hours passed since the last training
+- new logs exceed the configured threshold
+- feature distribution drift exceeds the configured drift threshold
+
 ---
 
 ## For live/continuous ingestion
@@ -157,6 +185,13 @@ python scripts/fortigate_autoblock.py \
 - **Output:** anomaly score (negative = more anomalous) + risk score 0–100
 - **Retrain:** POST /api/ml/train — do this after every major log ingestion
 
+### ML Intern (hybrid retraining governance)
+- **What it does:** monitors Redis and decides whether a new model should be trained
+- **Hybrid triggers:** time elapsed, new log volume, or data drift
+- **Output:** candidate model, metadata, anomaly rate, drift score, report summary
+- **Approval:** candidate models are not auto-deployed; approve one with `/api/ml-intern/approve-model/{model_id}`
+- **Rollback:** `/api/ml-intern/rollback` restores the previous approved model
+
 ### Subnet clustering (NetworkX)
 - **What it does:** Builds a graph where IPs in the same /24 subnet are connected
 - **Output:** connected components = coordinated attack groups
@@ -183,6 +218,11 @@ python scripts/fortigate_autoblock.py \
 | REDIS_PORT | 6379 | Redis port |
 | LOG_LEVEL | INFO | Backend log level |
 | MODEL_RETRAIN_HOURS | 24 | ML auto-retrain interval (future) |
+| ML_INTERN_CHECK_MINUTES | 5 | How often ML Intern checks retraining conditions |
+| ML_INTERN_TIME_HOURS | 24 | Time-based retraining threshold |
+| ML_INTERN_NEW_LOG_THRESHOLD | 10000 | Data-volume retraining threshold |
+| ML_INTERN_DRIFT_THRESHOLD | 0.35 | Distribution drift threshold |
+| ML_INTERN_MIN_TRAINING_IPS | 5 | Minimum IP feature rows needed to train |
 
 ---
 
@@ -192,12 +232,13 @@ python scripts/fortigate_autoblock.py \
 Browser
   ↓ :80
 Nginx (reverse proxy)
-  ↓ /api/ml/*        ↓ /api/*         ↓ /
-ML Engine :8001    Backend :8000    Frontend :80
-  ↓                   ↓
-  └──────── Redis :6379 ────────────┘
+  ↓ /api/ml/*        ↓ /api/ml-intern/*     ↓ /api/*         ↓ /
+ML Engine :8001    ML Intern :8002       Backend :8000    Frontend :80
+  ↓                   ↓                    ↓
+  └────────────────── Redis :6379 ─────────┘
              (IP trails, stats,
-              blocklist, ML scores)
+              blocklist, ML scores,
+              model metadata)
 ```
 
 ---

@@ -1868,6 +1868,7 @@
           Investigator</div>
         <div class="ns">Detection</div>
         <div class="ni" onclick="nav('ml')"><span class="ndot nd-g"></span>ML Anomaly</div>
+        <div class="ni" onclick="nav('mlintern')"><span class="ndot" style="background:var(--purple)"></span>ML Intern</div>
         <div class="ni" onclick="nav('clusters')"><span class="ndot nd-w"></span>Subnet Clusters</div>
         <div class="ns">Control</div>
         <div class="ni" onclick="nav('blocklist')"><span class="ndot nd-r"></span>Blocklist</div>
@@ -1878,6 +1879,9 @@
         <div class="srow" id="ml-status"><span
             style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> ML
           Engine</div>
+        <div class="srow" id="mlintern-status"><span
+            style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> ML
+          Intern</div>
         <div class="srow" id="ai-status"><span
             style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span> AI
           Engine</div>
@@ -2316,6 +2320,83 @@
           </table>
         </div>
       </div>
+      <div id="page-mlintern" class="page">
+        <div class="term-panel">
+          <div class="term-title">What ML Intern controls</div>
+          <div class="term-grid">
+            <div class="term"><b>Hybrid retraining</b> checks time, new log volume, and drift before creating a new
+              candidate model.</div>
+            <div class="term"><b>Candidate first</b> means ML Intern never deploys a model automatically. It trains,
+              evaluates, and waits for analyst approval.</div>
+            <div class="term"><b>Rollback</b> restores the previous approved model if the new model behaves badly.</div>
+          </div>
+        </div>
+        <section class="mlintern-hero">
+          <div class="mlintern-command">
+            <div class="ops-kicker">Model Governance</div>
+            <div class="ops-title" id="mi-posture">Checking ML Intern</div>
+            <div class="ops-copy" id="mi-summary">Scheduler, retraining triggers, candidate models, and approval state
+              will appear here.</div>
+            <div class="ops-tape">
+              <span id="mi-time-trigger">TIME —</span>
+              <span id="mi-data-trigger">DATA —</span>
+              <span id="mi-drift-trigger">DRIFT —</span>
+              <span id="mi-running">IDLE</span>
+            </div>
+          </div>
+          <div class="ops-chip">
+            <div class="ops-chip-l">New Logs</div>
+            <div class="ops-chip-v mv-a" id="mi-new-logs">—</div>
+            <div class="ops-chip-s" id="mi-new-logs-threshold">threshold —</div>
+          </div>
+          <div class="ops-chip">
+            <div class="ops-chip-l">Drift Score</div>
+            <div class="ops-chip-v mv-w" id="mi-drift">—</div>
+            <div class="ops-chip-s" id="mi-drift-threshold">threshold —</div>
+          </div>
+          <div class="ops-chip">
+            <div class="ops-chip-l">Candidate</div>
+            <div class="ops-chip-v mv-p" id="mi-candidate-count">—</div>
+            <div class="ops-chip-s">models waiting/reviewed</div>
+          </div>
+        </section>
+        <div class="mlintern-actions">
+          <button class="btn pri" onclick="loadMLIntern()">Refresh status</button>
+          <button class="btn yel" onclick="manualMLInternRetrain()">Manual retrain</button>
+          <button class="btn red" onclick="rollbackMLIntern()">Rollback active model</button>
+          <span id="mi-action-status" style="font-size:12px;color:var(--muted);align-self:center"></span>
+        </div>
+        <div class="cg2">
+          <div class="card">
+            <div class="ch"><span class="ct">Latest Candidate</span><span id="mi-candidate-state"
+                style="font-size:11px;color:var(--muted)">—</span></div>
+            <div class="cb" id="mi-candidate-body">
+              <div class="empty">No candidate model loaded yet</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ch"><span class="ct">Retraining Decision</span><span id="mi-check-time"
+                style="font-size:11px;color:var(--muted)">—</span></div>
+            <div class="cb" id="mi-trigger-body">
+              <div class="empty">No scheduler check loaded yet</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Model Registry</span><span id="mi-model-count"
+              style="font-size:11px;color:var(--muted)">—</span></div>
+          <div class="cb" id="mi-model-list">
+            <div class="empty">No model versions loaded yet</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Latest Training Report</span><span id="mi-report-state"
+              style="font-size:11px;color:var(--muted)">—</span></div>
+          <div class="cb" id="mi-report-body">
+            <div class="empty">No training report yet</div>
+          </div>
+        </div>
+      </div>
       <div id="page-clusters" class="page">
         <div style="margin-bottom:16px">
           <button class="btn pri" onclick="loadClusters()">Analyse clusters</button>
@@ -2387,7 +2468,7 @@
       const T = {
         overview: 'Overview', trail: 'IP Trail', livealerts: 'Live Alerts',
         deviations: 'Baseline Deviations', bslexplorer: 'Baseline Explorer',
-        aiinvestigate: 'AI Investigator', ml: 'ML Anomaly', clusters: 'Subnet Clusters',
+        aiinvestigate: 'AI Investigator', ml: 'ML Anomaly', mlintern: 'ML Intern', clusters: 'Subnet Clusters',
         blocklist: 'Blocklist', ingest: 'Ingest Logs'
       };
       document.getElementById('page-title').textContent = T[name] || name;
@@ -2396,6 +2477,7 @@
       if (name === 'blocklist') loadBlocklist();
       if (name === 'clusters') loadClusters();
       if (name === 'ml') loadAnomalies();
+      if (name === 'mlintern') loadMLIntern();
       if (name === 'deviations') loadDeviations();
     }
     function toast(msg, type = 'ok') {
@@ -2560,6 +2642,12 @@
         document.getElementById('ml-status').innerHTML = mlh.model_ready
           ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
           : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> Not trained';
+      }
+      const mih = await get('/api/ml-intern/health');
+      if (mih) {
+        document.getElementById('mlintern-status').innerHTML = mih.scheduler_running
+          ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--purple);display:inline-block"></span> Intern ready'
+          : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> Intern idle';
       }
     }
     function doSearch() { const q = document.getElementById('ip-search').value.trim(); if (!q) return; goTrail(q); }
@@ -3013,6 +3101,168 @@
       document.getElementById('qa-status').textContent = 'Training model…';
       const r = await post(`${ML}/train`);
       if (r) { document.getElementById('qa-status').textContent = `Model trained — ${r.anomalies} anomalies found`; toast('Model trained!', 'ok'); }
+    }
+
+    function fmtNumber(v) {
+      if (v === null || v === undefined || v === '') return '—';
+      const n = Number(v);
+      return Number.isFinite(n) ? n.toLocaleString() : String(v);
+    }
+    function fmtPct(v) {
+      if (v === null || v === undefined || v === '') return '—';
+      const n = Number(v);
+      return Number.isFinite(n) ? (n * 100).toFixed(2) + '%' : String(v);
+    }
+    function fmtModelTime(value) {
+      if (!value) return '—';
+      return String(value).substring(0, 19).replace('T', ' ');
+    }
+    function triggerBadge(label, active) {
+      return `<span class="mi-trigger ${active ? 'on' : 'off'}">${label}: ${active ? 'ON' : 'off'}</span>`;
+    }
+    function modelStatusBadge(status) {
+      const s = status || 'unknown';
+      const cls = s === 'active' ? 'low' : s === 'candidate' ? 'high' : s === 'previous' ? 'medium' : 'blocked';
+      return `<span class="badge ${cls}">${s}</span>`;
+    }
+    function renderMetricTile(label, value, sub = '') {
+      return `<div class="mi-mini">
+        <div class="mi-mini-l">${label}</div>
+        <div class="mi-mini-v">${value}</div>
+        ${sub ? `<div class="mi-mini-s">${sub}</div>` : ''}
+      </div>`;
+    }
+    function renderMLInternCandidate(model) {
+      if (!model) return '<div class="empty">No candidate model available yet. Click Manual retrain to create one.</div>';
+      const isCandidate = model.status === 'candidate';
+      return `<div class="mi-candidate">
+        <div class="mi-candidate-head">
+          <div>
+            <div class="mi-model-id">${model.model_id || '—'}</div>
+            <div class="mi-model-meta">trained ${fmtModelTime(model.trained_at)} · ${fmtNumber(model.training_rows)} rows</div>
+          </div>
+          ${modelStatusBadge(model.status)}
+        </div>
+        <div class="mi-mini-grid">
+          ${renderMetricTile('Anomaly rate', fmtPct(model.anomaly_rate), 'candidate outlier share')}
+          ${renderMetricTile('Drift score', model.drift_score ?? '—', 'hybrid drift check')}
+          ${renderMetricTile('Distribution diff', model.distribution_difference ?? '—', 'vs active model')}
+          ${renderMetricTile('Score shift', model.score_shift ?? '—', 'vs active score mean')}
+        </div>
+        <div class="mi-report-summary">${model.report_summary || 'No report summary provided.'}</div>
+        <div class="mi-recommendation">Recommendation: <b>${(model.recommendation || 'review').replace(/_/g, ' ')}</b></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn pri" ${isCandidate ? '' : 'disabled'} onclick="approveMLInternModel('${model.model_id}')">Approve candidate</button>
+          <button class="btn" onclick="loadMLIntern()">Refresh</button>
+        </div>
+      </div>`;
+    }
+    function renderMLInternTriggers(check = {}) {
+      const thresholds = check.thresholds || {};
+      return `<div class="mi-trigger-panel">
+        <div class="mi-trigger-row">${triggerBadge('Time', check.time_trigger)}<span>${check.hours_since_train ?? 'never'} hours since train · threshold ${thresholds.time_hours ?? '—'}h</span></div>
+        <div class="mi-trigger-row">${triggerBadge('Data', check.data_trigger)}<span>${fmtNumber(check.new_logs_count)} new logs · threshold ${fmtNumber(thresholds.new_logs)}</span></div>
+        <div class="mi-trigger-row">${triggerBadge('Drift', check.drift_trigger)}<span>score ${check.drift_score ?? '—'} · threshold ${thresholds.drift ?? '—'}</span></div>
+        <div class="mi-decision ${check.should_retrain ? 'on' : 'off'}">${check.should_retrain ? 'Retraining condition is currently TRUE' : 'No retraining needed right now'}</div>
+      </div>`;
+    }
+    function renderMLInternModels(models = [], activeId = null) {
+      if (!models.length) return '<div class="empty">No model versions yet</div>';
+      return `<div class="mi-model-grid">${models.map(m => `
+        <div class="mi-model-card ${m.model_id === activeId ? 'active' : ''}">
+          <div class="mi-model-top">
+            <span class="mi-model-id">${m.model_id}</span>
+            ${modelStatusBadge(m.status)}
+          </div>
+          <div class="mi-model-meta">${fmtModelTime(m.trained_at)} · ${fmtNumber(m.training_rows)} rows</div>
+          <div class="mi-model-stats">
+            <span>Anomaly ${fmtPct(m.anomaly_rate)}</span>
+            <span>Drift ${m.drift_score ?? '—'}</span>
+            <span>Diff ${m.distribution_difference ?? '—'}</span>
+          </div>
+          <div class="mi-model-summary">${m.report_summary || ''}</div>
+          ${m.status === 'candidate' ? `<button class="btn pri" onclick="approveMLInternModel('${m.model_id}')">Approve</button>` : ''}
+        </div>`).join('')}</div>`;
+    }
+    function renderMLInternReport(report) {
+      if (!report || report.status === 'none') return '<div class="empty">No training report has been generated yet</div>';
+      const top = report.top_anomaly_ips || [];
+      return `<div class="mi-report">
+        <div class="mi-report-summary">${report.report_summary || 'No report summary provided.'}</div>
+        <div class="mi-mini-grid">
+          ${renderMetricTile('Model', report.model_id || '—', report.status || '')}
+          ${renderMetricTile('Rows', fmtNumber(report.training_rows), 'training feature rows')}
+          ${renderMetricTile('Anomaly rate', fmtPct(report.anomaly_rate), 'new candidate')}
+          ${renderMetricTile('Drift', report.drift_score ?? '—', 'latest trigger score')}
+        </div>
+        <div class="mi-section-title">Top anomaly IPs from candidate</div>
+        <div class="mi-anomaly-list">${top.length ? top.map(item => `<span class="ip-chip">${item.ip} (${item.score})</span>`).join('') : '<span style="color:var(--muted)">No top anomaly list available</span>'}</div>
+      </div>`;
+    }
+    async function loadMLIntern() {
+      const [status, models, report] = await Promise.all([
+        get('/api/ml-intern/status'),
+        get('/api/ml-intern/models'),
+        get('/api/ml-intern/reports/latest'),
+      ]);
+      if (!status) return;
+      const latest = status.latest_training;
+      const check = status.latest_check || {};
+      const allModels = models?.models || [];
+      const candidates = allModels.filter(m => m.status === 'candidate');
+      const active = status.active_model;
+
+      document.getElementById('mi-posture').textContent = active ? 'Active model governed' : latest ? 'Candidate waiting for approval' : 'No approved model yet';
+      document.getElementById('mi-summary').textContent = latest
+        ? `${latest.model_id} trained on ${fmtNumber(latest.training_rows)} rows. ${latest.report_summary || ''}`
+        : 'ML Intern is monitoring Redis and will create candidate models when hybrid retraining conditions are met.';
+      document.getElementById('mi-time-trigger').textContent = `TIME ${check.time_trigger ? 'ON' : 'off'}`;
+      document.getElementById('mi-data-trigger').textContent = `DATA ${check.data_trigger ? 'ON' : 'off'}`;
+      document.getElementById('mi-drift-trigger').textContent = `DRIFT ${check.drift_trigger ? 'ON' : 'off'}`;
+      document.getElementById('mi-running').textContent = status.running_job ? 'TRAINING' : 'IDLE';
+      document.getElementById('mi-new-logs').textContent = fmtNumber(check.new_logs_count);
+      document.getElementById('mi-new-logs-threshold').textContent = `threshold ${fmtNumber(check.thresholds?.new_logs)}`;
+      document.getElementById('mi-drift').textContent = check.drift_score ?? '—';
+      document.getElementById('mi-drift-threshold').textContent = `threshold ${check.thresholds?.drift ?? '—'}`;
+      document.getElementById('mi-candidate-count').textContent = candidates.length;
+      document.getElementById('mi-candidate-state').textContent = latest ? latest.status : 'none';
+      document.getElementById('mi-candidate-body').innerHTML = renderMLInternCandidate(latest);
+      document.getElementById('mi-check-time').textContent = check.checked_at ? fmtModelTime(check.checked_at) : 'live';
+      document.getElementById('mi-trigger-body').innerHTML = renderMLInternTriggers(check);
+      document.getElementById('mi-model-count').textContent = allModels.length + ' version(s)';
+      document.getElementById('mi-model-list').innerHTML = renderMLInternModels(allModels, models?.active_model_id);
+      document.getElementById('mi-report-state').textContent = report?.model_id || report?.status || '—';
+      document.getElementById('mi-report-body').innerHTML = renderMLInternReport(report);
+      document.getElementById('mlintern-status').innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:var(--purple);display:inline-block"></span> Intern ready';
+    }
+    async function manualMLInternRetrain() {
+      document.getElementById('mi-action-status').textContent = 'Training candidate…';
+      const r = await post('/api/ml-intern/retrain');
+      if (!r) return;
+      if (r.status === 'already_running') {
+        toast('ML Intern is already training', 'warn');
+      } else if (r.status === 'not_enough_data') {
+        toast('Not enough feature rows for ML Intern', 'warn');
+      } else {
+        toast('Candidate model created: ' + r.model_id, 'ok');
+      }
+      document.getElementById('mi-action-status').textContent = '';
+      await loadMLIntern();
+    }
+    async function approveMLInternModel(modelId) {
+      if (!modelId) return;
+      document.getElementById('mi-action-status').textContent = 'Approving ' + modelId + '…';
+      const r = await post(`/api/ml-intern/approve-model/${modelId}`);
+      if (r) toast('Approved active model: ' + modelId, 'ok');
+      document.getElementById('mi-action-status').textContent = '';
+      await loadMLIntern();
+    }
+    async function rollbackMLIntern() {
+      document.getElementById('mi-action-status').textContent = 'Rolling back model…';
+      const r = await post('/api/ml-intern/rollback');
+      if (r) toast('Rolled back to previous model', 'warn');
+      document.getElementById('mi-action-status').textContent = '';
+      await loadMLIntern();
     }
 
     function mlRiskLabel(risk) {

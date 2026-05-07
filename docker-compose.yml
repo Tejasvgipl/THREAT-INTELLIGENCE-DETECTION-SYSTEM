@@ -52,6 +52,27 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  ml-intern:
+    build: ./ml-intern
+    container_name: cs_ml_intern
+    ports:
+      - "8002:8002"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ML_INTERN_CHECK_MINUTES=${ML_INTERN_CHECK_MINUTES:-5}
+      - ML_INTERN_TIME_HOURS=${ML_INTERN_TIME_HOURS:-24}
+      - ML_INTERN_NEW_LOG_THRESHOLD=${ML_INTERN_NEW_LOG_THRESHOLD:-10000}
+      - ML_INTERN_DRIFT_THRESHOLD=${ML_INTERN_DRIFT_THRESHOLD:-0.35}
+      - ML_INTERN_MIN_TRAINING_IPS=${ML_INTERN_MIN_TRAINING_IPS:-5}
+      - ML_INTERN_MODEL_DIR=/app/models
+    volumes:
+      - ml_models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build: ./frontend
     container_name: cs_frontend
