@@ -1,6 +1,6 @@
-# CyberSentinel — Threat Intelligence SIEM Platform
+# CyberSentinel — AI SOC / SIEM Platform
 
-A full-stack, Dockerised threat intelligence dashboard for SOC teams.  
+A full-stack, Dockerised AI SOC dashboard for security teams.  
 Built for **Virtual Galaxy Infotech Ltd** · Bank client log analysis.
 
 ---
@@ -13,12 +13,12 @@ cybersentinel/
 ├── .env.example                ← Copy to .env and fill in keys
 │
 ├── frontend/                   ← Single-page dashboard (nginx)
-│   ├── index.html              ← Full threat intel UI
+│   ├── index.html              ← Full SOC dashboard UI
 │   ├── nginx.conf
 │   └── Dockerfile
 │
 ├── backend/                    ← FastAPI REST API
-│   ├── main.py                 ← Log ingestion, IP trail, blocklist, intel
+│   ├── main.py                 ← Log ingestion, IP trail, blocklist, baselines
 │   ├── requirements.txt
 │   └── Dockerfile
 │
@@ -60,7 +60,7 @@ cybersentinel/
 ### 2. Clone / unzip and start
 ```bash
 cd cybersentinel
-cp .env.example .env           # optionally add ABUSEIPDB_KEY
+cp .env.example .env           # optionally add GROQ_API_KEY for AI explanations
 docker compose up --build -d
 ```
 
@@ -105,7 +105,6 @@ GET  /api/trail/{ip}              Full event trail for an IP
 GET  /api/trail/{ip}/summary      Summary (first/last seen, threat types)
 GET  /api/stats                   Global metrics
 GET  /api/hot-ips                 All high/critical severity IPs
-GET  /api/intel/{ip}              Threat intel (local + AbuseIPDB)
 GET  /api/blocklist               View blocklist
 POST /api/blocklist/add           Block an IP
 DEL  /api/blocklist/{ip}          Unblock an IP
@@ -199,21 +198,10 @@ python scripts/fortigate_autoblock.py \
 
 ---
 
-## Adding AbuseIPDB live intel
-
-1. Register free at https://www.abuseipdb.com/register
-2. Copy your API key
-3. Add to `.env`: `ABUSEIPDB_KEY=your_key`
-4. `docker compose restart backend`
-5. Now IP Trail → **+ Intel** shows live reputation scores
-
----
-
 ## Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| ABUSEIPDB_KEY | demo | AbuseIPDB API key for live threat intel |
 | REDIS_HOST | redis | Redis hostname |
 | REDIS_PORT | 6379 | Redis port |
 | LOG_LEVEL | INFO | Backend log level |

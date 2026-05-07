@@ -1,6 +1,6 @@
 """
 CyberSentinel Backend — FastAPI v2.0
-Handles: log ingestion, IP trail, threat intel, stats, 24 behavioural baselines
+Handles: log ingestion, IP trail, stats, blocklist, 24 behavioural baselines
 """
 import os, json, time, statistics
 from datetime import datetime, timezone
@@ -16,7 +16,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 REDIS_HOST    = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT    = int(os.getenv("REDIS_PORT", 6379))
-ABUSEIPDB_KEY = os.getenv("ABUSEIPDB_KEY", "demo")
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL    = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
@@ -929,49 +928,6 @@ async def get_hot_ips():
         summary = await trail_summary(ip)
         result.append(summary)
     result.sort(key=lambda x: x.get("total",0), reverse=True)
-    return result
-
-
-# ── threat intel ──────────────────────────────────────────────────────────────
-
-@app.get("/api/intel/{ip}")
-async def get_intel(ip: str):
-    r      = await get_redis()
-    cached = await r.get(f"intel:{ip}")
-    if cached:
-        return json.loads(cached)
-
-    result = {
-        "ip":           ip,
-        "is_known_bad": any(ip.startswith(s) for s in KNOWN_BAD_SUBNETS),
-        "in_blocklist": await r.sismember("blocklist:auto", ip),
-        "abuseipdb":    None,
-        "source":       "local",
-    }
-
-    if ABUSEIPDB_KEY and ABUSEIPDB_KEY != "demo":
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.get(
-                    "https://api.abuseipdb.com/api/v2/check",
-                    params={"ipAddress":ip,"maxAgeInDays":90},
-                    headers={"Key":ABUSEIPDB_KEY,"Accept":"application/json"},
-                )
-                if resp.status_code == 200:
-                    data = resp.json().get("data",{})
-                    result["abuseipdb"] = {
-                        "score":     data.get("abuseConfidenceScore",0),
-                        "country":   data.get("countryCode",""),
-                        "isp":       data.get("isp",""),
-                        "reports":   data.get("totalReports",0),
-                        "is_tor":    data.get("isTor",False),
-                        "is_public": data.get("isPublic",True),
-                    }
-                    result["source"] = "abuseipdb"
-        except Exception:
-            pass
-
-    await r.setex(f"intel:{ip}", 900, json.dumps(result))
     return result
 
 

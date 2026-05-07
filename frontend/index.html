@@ -2063,7 +2063,6 @@
             <input id="trail-input" placeholder="Enter IP (e.g. 85.11.187.36)"
               style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
             <button class="btn pri" onclick="loadTrail()">Load trail</button>
-            <button class="btn" onclick="loadIntel()">+ Intel</button>
             <button class="btn yel" onclick="loadBaseline()">Baseline</button>
             <button class="btn ai" onclick="aiExplainIP()">AI analysis</button>
             <button class="btn red" onclick="blockCurrent()">Block IP</button>
@@ -2103,10 +2102,6 @@
               <span class="ai-model" id="ai-trail-model"></span>
             </div>
             <div id="ai-trail-body" class="ai-body"></div>
-          </div>
-          <div id="intel-panel" style="display:none" class="card">
-            <div class="ch"><span class="ct">Threat Intel</span></div>
-            <div class="cb" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
           </div>
           <div id="bsl-panel" style="display:none" class="card">
             <div class="ch"><span class="ct">Baseline Profile</span><span id="bsl-alert-count"
@@ -2705,15 +2700,6 @@
       document.getElementById('ai-trail-model').textContent = (r.model || 'AI model') + ' · ' + String(r.generated_at || '').substring(0, 19);
       body.innerHTML = formatAIText(r.explanation);
       toast('AI analysis ready', 'ai');
-    }
-    async function loadIntel() {
-      if (!curIP) return;
-      const d = await get(`${API}/intel/${curIP}`); if (!d) return;
-      document.getElementById('intel-panel').style.display = 'block';
-      let h = `<b>IP:</b> ${d.ip} &nbsp;|&nbsp; <b>Known bad:</b> ${d.is_known_bad ? '<span style="color:var(--danger)">YES</span>' : 'No'} &nbsp;|&nbsp; <b>Blocked:</b> ${d.in_blocklist ? '<span style="color:var(--danger)">YES</span>' : 'No'}<br>`;
-      if (d.abuseipdb) { const a = d.abuseipdb; h += `<b>AbuseIPDB:</b> <span style="color:${a.score > 50 ? 'var(--danger)' : a.score > 25 ? 'var(--warn)' : 'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp; <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor ? 'Yes' : 'No'}`; }
-      else h += `<span style="color:var(--muted)">AbuseIPDB not configured</span>`;
-      document.getElementById('intel-body').innerHTML = h;
     }
     async function loadBaseline() {
       if (!curIP) return;
