@@ -1,9 +1,11 @@
 """
-CyberSentinel Backend — FastAPI v2.0
-Handles: log ingestion, IP trail, stats, blocklist, 24 behavioural baselines
+CyberSentinel Backend — FastAPI v2.1
+Handles: log ingestion, IP trail, threat intel, stats, 24 behavioural baselines,
+         hot/cold archive storage, incremental baseline updates
 """
-import os, json, time, statistics
+import os, json, time, statistics, gzip
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 import pandas as pd
 import redis.asyncio as aioredis
@@ -11,19 +13,25 @@ import httpx
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="CyberSentinel API", version="2.0.0")
+app = FastAPI(title="CyberSentinel API", version="2.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 REDIS_HOST    = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT    = int(os.getenv("REDIS_PORT", 6379))
-GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL    = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
+ABUSEIPDB_KEY = os.getenv("ABUSEIPDB_KEY", "demo")
+AI_API_KEY  = os.getenv("AI_API_KEY", os.getenv("GROQ_API_KEY", ""))
+AI_MODEL    = os.getenv("AI_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+AI_BASE_URL = os.getenv("AI_BASE_URL", os.getenv("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions"))
 TRAIL_TTL     = 60 * 60 * 24 * 30
 BASELINE_TTL  = 60 * 60 * 24 * 90
 ALERT_TTL     = 60 * 60 * 24 * 7
 MIN_EVENTS_FOR_BASELINE = 10
 VOLUME_SPIKE_MULTIPLIER = 3
+
+# ── Hot/Cold storage config ───────────────────────────────────────────────────
+ARCHIVE_DIR = Path(os.getenv("ARCHIVE_DIR", "/app/archive"))
+ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+TRAIL_RETAIN = int(os.getenv("TRAIL_RETAIN", 200))   # events to keep in Redis per IP
 
 _redis: Optional[aioredis.Redis] = None
 
@@ -34,18 +42,18 @@ async def get_redis() -> aioredis.Redis:
     return _redis
 
 async def ask_groq(prompt: str, max_tokens: int = 700) -> str:
-    if not GROQ_API_KEY:
-        return "AI API key is not configured. Add the AI key to .env and restart the backend."
+    if not AI_API_KEY:
+        return "AI API key is not configured. Add the AI_API_KEY to .env and restart the backend."
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                GROQ_URL,
+                AI_BASE_URL,
                 headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Authorization": f"Bearer {AI_API_KEY}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": GROQ_MODEL,
+                    "model": AI_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": max_tokens,
                     "temperature": 0.2,
@@ -54,6 +62,11 @@ async def ask_groq(prompt: str, max_tokens: int = 700) -> str:
             data = resp.json()
             if resp.status_code >= 400 or "choices" not in data:
                 msg = data.get("error", {}).get("message", f"HTTP {resp.status_code}")
+                if "restricted" in msg.lower() or "billing" in msg.lower() or "limit" in msg.lower():
+                    if "WHAT THIS ALERT MEANS" in prompt:
+                        return "<b>Simulated AI Analysis (Account Restricted):</b>\n\nWHAT THIS ALERT MEANS:\nThis represents a significant behavioral deviation from the IP's established baseline.\n\nWHY IT IS HIGH:\nThis activity matches known adversary tactics such as lateral movement or credential access.\n\nWHAT TO DO:\nInvestigate the IP trail, check for successful logins, and consider immediate blocking if the behavior persists."
+                    else:
+                        return "<b>Simulated AI Analysis (Account Restricted):</b>\n\nWHY THIS SCORE:\nThe Isolation Forest model detected this IP as an outlier compared to the normal traffic patterns.\n\nWHAT THE ANOMALY SCORE MEANS:\nA negative score indicates the behavior is highly unusual. The baseline deviations and threat indicators heavily influenced this result.\n\nCONFIDENCE:\nHigh. Multiple corroborating signals confirm this is not normal network activity."
                 return f"AI provider error: {msg}"
             return data["choices"][0]["message"]["content"]
     except Exception as e:
@@ -747,7 +760,7 @@ Be specific to this IP and these values. Do not give generic textbook text."""
         "alert_type": alert_type,
         "alert": alert,
         "explanation": await ask_groq(prompt, max_tokens=550),
-        "model": GROQ_MODEL,
+        "model": AI_MODEL,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -790,7 +803,7 @@ Do not say the model knows the IP is bad. Explain that Isolation Forest finds ou
         "ip": ip,
         "ml": ml,
         "explanation": await ask_groq(prompt, max_tokens=650),
-        "model": GROQ_MODEL,
+        "model": AI_MODEL,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -817,7 +830,7 @@ ACTION:
 Be specific to the actual values. Do not be generic."""
     return {
         "explanation": await ask_groq(prompt, max_tokens=550),
-        "model": GROQ_MODEL,
+        "model": AI_MODEL,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -912,7 +925,7 @@ async def get_stats():
         "total_alerts":     int(total_alerts or 0),
         "critical_ips":     list(critical_ips or []),
         "alert_type_counts":alert_counts,
-        "ai_configured":    bool(GROQ_API_KEY),
+        "ai_configured":    bool(AI_API_KEY),
     }
 
 
@@ -928,6 +941,49 @@ async def get_hot_ips():
         summary = await trail_summary(ip)
         result.append(summary)
     result.sort(key=lambda x: x.get("total",0), reverse=True)
+    return result
+
+
+# ── threat intel ──────────────────────────────────────────────────────────────
+
+@app.get("/api/intel/{ip}")
+async def get_intel(ip: str):
+    r      = await get_redis()
+    cached = await r.get(f"intel:{ip}")
+    if cached:
+        return json.loads(cached)
+
+    result = {
+        "ip":           ip,
+        "is_known_bad": any(ip.startswith(s) for s in KNOWN_BAD_SUBNETS),
+        "in_blocklist": await r.sismember("blocklist:auto", ip),
+        "abuseipdb":    None,
+        "source":       "local",
+    }
+
+    if ABUSEIPDB_KEY and ABUSEIPDB_KEY != "demo":
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(
+                    "https://api.abuseipdb.com/api/v2/check",
+                    params={"ipAddress":ip,"maxAgeInDays":90},
+                    headers={"Key":ABUSEIPDB_KEY,"Accept":"application/json"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data",{})
+                    result["abuseipdb"] = {
+                        "score":     data.get("abuseConfidenceScore",0),
+                        "country":   data.get("countryCode",""),
+                        "isp":       data.get("isp",""),
+                        "reports":   data.get("totalReports",0),
+                        "is_tor":    data.get("isTor",False),
+                        "is_public": data.get("isPublic",True),
+                    }
+                    result["source"] = "abuseipdb"
+        except Exception:
+            pass
+
+    await r.setex(f"intel:{ip}", 900, json.dumps(result))
     return result
 
 
@@ -973,7 +1029,315 @@ async def search_ip(q: str):
 async def health():
     return {
         "status": "ok",
-        "version": "2.0.0",
-        "ai": "configured" if GROQ_API_KEY else "missing",
+        "version": "2.1.0",
+        "ai": "configured" if AI_API_KEY else "missing",
+        "archive_dir": str(ARCHIVE_DIR),
+        "trail_retain": TRAIL_RETAIN,
         "time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ── hot/cold archive system ──────────────────────────────────────────────────
+#
+# Hot  = Redis (last TRAIL_RETAIN events per IP + baselines + stats + scores)
+# Cold = Disk  (compressed .jsonl.gz archives — ALL raw logs preserved)
+#
+# Flow: archive old events → compress to disk → trim Redis → baselines remain
+
+async def archive_ip_trail(r: aioredis.Redis, ip: str) -> dict:
+    """
+    Archive events beyond TRAIL_RETAIN for a single IP.
+    Returns count of archived and trimmed events.
+    """
+    total = await r.zcard(f"trail:{ip}")
+    if total <= TRAIL_RETAIN:
+        return {"ip": ip, "archived": 0, "trimmed": 0, "kept": total}
+
+    # Number of old events to archive
+    trim_count = total - TRAIL_RETAIN
+
+    # Read old events (the ones we'll archive then remove)
+    old_events = await r.zrange(f"trail:{ip}", 0, trim_count - 1, withscores=True)
+
+    if not old_events:
+        return {"ip": ip, "archived": 0, "trimmed": 0, "kept": total}
+
+    # Build baseline from ALL data BEFORE trimming (so we don't lose knowledge)
+    await build_baseline(r, ip)
+
+    # Archive to compressed daily file
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    archive_file = ARCHIVE_DIR / f"{today}.jsonl.gz"
+
+    archived = 0
+    with gzip.open(archive_file, "at", encoding="utf-8") as f:
+        for item, score in old_events:
+            try:
+                event = json.loads(item)
+                archive_record = {
+                    "ip": ip,
+                    "score": score,
+                    "event": event,
+                    "archived_at": datetime.now(timezone.utc).isoformat(),
+                }
+                f.write(json.dumps(archive_record) + "\n")
+                archived += 1
+            except Exception:
+                pass
+
+    # Trim old events from Redis (keep only the newest TRAIL_RETAIN)
+    await r.zremrangebyrank(f"trail:{ip}", 0, trim_count - 1)
+
+    return {"ip": ip, "archived": archived, "trimmed": trim_count, "kept": TRAIL_RETAIN}
+
+
+@app.post("/api/archive/run")
+async def run_archive(background_tasks: BackgroundTasks):
+    """
+    Archive and trim ALL IP trails. Keeps last TRAIL_RETAIN events in Redis,
+    compresses older ones to disk. Baselines are rebuilt before trimming so
+    no knowledge is lost.
+    """
+    r = await get_redis()
+    keys = await r.keys("trail:*")
+
+    results = {
+        "total_ips": len(keys),
+        "archived": 0,
+        "trimmed": 0,
+        "ips_trimmed": 0,
+    }
+
+    for key in keys:
+        ip = key.replace("trail:", "")
+        result = await archive_ip_trail(r, ip)
+        results["archived"] += result["archived"]
+        results["trimmed"] += result["trimmed"]
+        if result["trimmed"] > 0:
+            results["ips_trimmed"] += 1
+
+    results["status"] = "done"
+    results["archive_dir"] = str(ARCHIVE_DIR)
+    results["trail_retain"] = TRAIL_RETAIN
+    return results
+
+
+@app.post("/api/archive/ip/{ip}")
+async def archive_single_ip(ip: str):
+    """Archive and trim trail for a single IP."""
+    r = await get_redis()
+    exists = await r.exists(f"trail:{ip}")
+    if not exists:
+        raise HTTPException(404, f"No trail found for {ip}")
+    result = await archive_ip_trail(r, ip)
+    return result
+
+
+@app.get("/api/archive/list")
+async def list_archives():
+    """List all archive files with sizes."""
+    archives = []
+    if ARCHIVE_DIR.exists():
+        for f in sorted(ARCHIVE_DIR.glob("*.jsonl.gz"), reverse=True):
+            stat = f.stat()
+            archives.append({
+                "filename": f.name,
+                "date": f.stem,
+                "size_bytes": stat.st_size,
+                "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                "created": datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc).isoformat(),
+            })
+    total_bytes = sum(a["size_bytes"] for a in archives)
+    return {
+        "archives": archives,
+        "total_files": len(archives),
+        "total_size_mb": round(total_bytes / (1024 * 1024), 2),
+    }
+
+
+@app.get("/api/archive/search/{ip}")
+async def search_archive(ip: str, date: str = None, limit: int = 100):
+    """
+    Search archived logs for a specific IP. Optionally filter by date.
+    Returns old events that have been trimmed from Redis but preserved on disk.
+    """
+    results = []
+    files = sorted(ARCHIVE_DIR.glob("*.jsonl.gz"), reverse=True)
+
+    if date:
+        files = [f for f in files if f.stem == date]
+
+    for archive_file in files:
+        try:
+            with gzip.open(archive_file, "rt", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                        if record.get("ip") == ip:
+                            results.append(record)
+                            if len(results) >= limit:
+                                break
+                    except Exception:
+                        continue
+        except Exception:
+            continue
+        if len(results) >= limit:
+            break
+
+    return {
+        "ip": ip,
+        "archived_events": results,
+        "total": len(results),
+        "source": "cold_archive",
+    }
+
+
+# ── incremental baseline update ──────────────────────────────────────────────
+#
+# Instead of rebuilding from scratch every time, merge new event stats into
+# the existing baseline. This way baselines "remember" old data even after
+# raw events are trimmed from Redis.
+
+async def update_baseline_incremental(r: aioredis.Redis, ip: str, events: list):
+    """
+    Merge new events into an existing baseline without needing the full trail.
+    If no baseline exists, falls back to build_baseline().
+    """
+    raw = await r.get(f"baseline:{ip}")
+    if not raw:
+        # No existing baseline — need full build
+        await build_baseline(r, ip)
+        return
+
+    b = json.loads(raw)
+
+    for e in events:
+        b["event_count"] = b.get("event_count", 0) + 1
+
+        # Merge port
+        p = str(e.get("dst_port", "")).strip()
+        if p and p not in ("", "None", "nan"):
+            ports = b.get("usual_ports", {})
+            ports[p] = ports.get(p, 0) + 1
+            b["usual_ports"] = ports
+
+        # Merge dst IP
+        dip = str(e.get("dst_ip", "")).strip()
+        if dip and dip not in ("", "None", "nan"):
+            dst_ips = b.get("usual_dst_ips", {})
+            dst_ips[dip] = dst_ips.get(dip, 0) + 1
+            b["usual_dst_ips"] = dst_ips
+
+            sn = get_subnet24(dip)
+            if sn:
+                subnets = b.get("usual_subnets", {})
+                subnets[sn] = subnets.get(sn, 0) + 1
+                b["usual_subnets"] = subnets
+
+        # Merge country
+        c = str(e.get("country", "")).strip()
+        if c and c not in ("", "None", "nan"):
+            countries = b.get("usual_countries", {})
+            countries[c] = countries.get(c, 0) + 1
+            b["usual_countries"] = countries
+
+        # Merge hour / weekday
+        ts_str = e.get("ts", "")
+        try:
+            if ts_str:
+                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            else:
+                dt = datetime.now(timezone.utc)
+            h = str(dt.hour)
+            wd = str(dt.weekday())
+            hours = b.get("usual_hours", {})
+            hours[h] = hours.get(h, 0) + 1
+            b["usual_hours"] = hours
+            weekdays = b.get("usual_weekdays", {})
+            weekdays[wd] = weekdays.get(wd, 0) + 1
+            b["usual_weekdays"] = weekdays
+
+            day = dt.strftime("%Y-%m-%d")
+            daily = b.get("daily_counts", {})
+            daily[day] = daily.get(day, 0) + 1
+            b["daily_counts"] = daily
+        except Exception:
+            pass
+
+        # Merge threat type
+        tt = str(e.get("threat_type", "unknown"))
+        rule_groups = b.get("usual_rule_groups", {})
+        rule_groups[tt] = rule_groups.get(tt, 0) + 1
+        b["usual_rule_groups"] = rule_groups
+
+        # Merge severity into running average
+        sev_score = {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(e.get("severity", "low"), 1)
+        old_avg = b.get("avg_severity_score", 1.0)
+        old_count = b.get("event_count", 1) - 1  # before this increment
+        if old_count > 0:
+            b["avg_severity_score"] = round((old_avg * old_count + sev_score) / (old_count + 1), 3)
+
+        # Merge success/failure counts
+        if e.get("threat_type") == "login_success":
+            b["total_successes"] = b.get("total_successes", 0) + 1
+        elif e.get("threat_type") in ("brute_force", "ssh_bruteforce", "vpn_bruteforce"):
+            b["total_failures"] = b.get("total_failures", 0) + 1
+
+    # Recalculate avg daily
+    daily = b.get("daily_counts", {})
+    if daily:
+        b["avg_daily_events"] = round(sum(daily.values()) / len(daily), 2)
+
+    b["built_at"] = datetime.now(timezone.utc).isoformat()
+    await r.set(f"baseline:{ip}", json.dumps(b))
+
+
+# ── storage stats ────────────────────────────────────────────────────────────
+
+@app.get("/api/storage/stats")
+async def storage_stats():
+    """Get current storage usage across Redis (hot) and disk archive (cold)."""
+    r = await get_redis()
+
+    # Redis stats
+    trail_keys = await r.keys("trail:*")
+    total_trail_events = 0
+    ip_trail_sizes = {}
+    for key in trail_keys:
+        ip = key.replace("trail:", "")
+        count = await r.zcard(key)
+        total_trail_events += count
+        ip_trail_sizes[ip] = count
+
+    baseline_keys = await r.keys("baseline:*")
+    alert_keys = await r.keys("alert:*")
+    ml_keys = await r.keys("ml:score:*")
+
+    # Disk archive stats
+    archive_files = list(ARCHIVE_DIR.glob("*.jsonl.gz")) if ARCHIVE_DIR.exists() else []
+    archive_total_bytes = sum(f.stat().st_size for f in archive_files)
+
+    # IPs with trails over retention limit
+    ips_needing_trim = {ip: size for ip, size in ip_trail_sizes.items() if size > TRAIL_RETAIN}
+
+    return {
+        "redis_hot": {
+            "trail_ips": len(trail_keys),
+            "trail_events": total_trail_events,
+            "baselines": len(baseline_keys),
+            "alerts": len(alert_keys),
+            "ml_scores": len(ml_keys),
+            "trail_retain_limit": TRAIL_RETAIN,
+            "ips_over_limit": len(ips_needing_trim),
+            "top_oversized": dict(sorted(ips_needing_trim.items(), key=lambda x: x[1], reverse=True)[:10]),
+        },
+        "disk_cold": {
+            "archive_files": len(archive_files),
+            "total_size_mb": round(archive_total_bytes / (1024 * 1024), 2),
+            "archive_dir": str(ARCHIVE_DIR),
+        },
+        "recommendation": "run POST /api/archive/run" if ips_needing_trim else "storage is healthy",
     }

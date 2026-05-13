@@ -2063,6 +2063,7 @@
             <input id="trail-input" placeholder="Enter IP (e.g. 85.11.187.36)"
               style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
             <button class="btn pri" onclick="loadTrail()">Load trail</button>
+            <button class="btn" onclick="loadIntel()">+ Intel</button>
             <button class="btn yel" onclick="loadBaseline()">Baseline</button>
             <button class="btn ai" onclick="aiExplainIP()">AI analysis</button>
             <button class="btn red" onclick="blockCurrent()">Block IP</button>
@@ -2102,6 +2103,10 @@
               <span class="ai-model" id="ai-trail-model"></span>
             </div>
             <div id="ai-trail-body" class="ai-body"></div>
+          </div>
+          <div id="intel-panel" style="display:none" class="card">
+            <div class="ch"><span class="ct">Threat Intel</span></div>
+            <div class="cb" id="intel-body" style="font-size:12px;color:var(--muted);line-height:1.9"></div>
           </div>
           <div id="bsl-panel" style="display:none" class="card">
             <div class="ch"><span class="ct">Baseline Profile</span><span id="bsl-alert-count"
@@ -2450,7 +2455,17 @@
   </div>
   <div class="toast-wrap" id="toast-wrap"></div>
   <script>
-    const API = '/api', ML = '/api/ml';
+    let API = '/api';
+    let ML = '/api/ml';
+    let INTERN = '/api/ml-intern';
+
+    // Auto-detect if running outside the main Nginx gateway (e.g. Live Server, direct file, or port 3000)
+    if (window.location.protocol === 'file:' || ['3000', '5500', '8080'].includes(window.location.port)) {
+      API = 'http://localhost:8000/api';
+      ML = 'http://localhost:8001/api/ml';
+      INTERN = 'http://localhost:8002'; // ml-intern runs on root paths internally
+    }
+
     let charts = {}, curIP = '';
 
     function nav(name) {
@@ -2638,7 +2653,7 @@
           ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block"></span> ML ready'
           : '<span style="width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block"></span> Not trained';
       }
-      const mih = await get('/api/ml-intern/health');
+      const mih = await get(`${INTERN}/health`);
       if (mih) {
         document.getElementById('mlintern-status').innerHTML = mih.scheduler_running
           ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--purple);display:inline-block"></span> Intern ready'
@@ -2700,6 +2715,15 @@
       document.getElementById('ai-trail-model').textContent = (r.model || 'AI model') + ' · ' + String(r.generated_at || '').substring(0, 19);
       body.innerHTML = formatAIText(r.explanation);
       toast('AI analysis ready', 'ai');
+    }
+    async function loadIntel() {
+      if (!curIP) return;
+      const d = await get(`${API}/intel/${curIP}`); if (!d) return;
+      document.getElementById('intel-panel').style.display = 'block';
+      let h = `<b>IP:</b> ${d.ip} &nbsp;|&nbsp; <b>Known bad:</b> ${d.is_known_bad ? '<span style="color:var(--danger)">YES</span>' : 'No'} &nbsp;|&nbsp; <b>Blocked:</b> ${d.in_blocklist ? '<span style="color:var(--danger)">YES</span>' : 'No'}<br>`;
+      if (d.abuseipdb) { const a = d.abuseipdb; h += `<b>AbuseIPDB:</b> <span style="color:${a.score > 50 ? 'var(--danger)' : a.score > 25 ? 'var(--warn)' : 'var(--ok)'}">${a.score}/100</span> &nbsp;|&nbsp; <b>Country:</b> ${a.country} &nbsp;|&nbsp; <b>ISP:</b> ${a.isp} &nbsp;|&nbsp; <b>Tor:</b> ${a.is_tor ? 'Yes' : 'No'}`; }
+      else h += `<span style="color:var(--muted)">AbuseIPDB not configured</span>`;
+      document.getElementById('intel-body').innerHTML = h;
     }
     async function loadBaseline() {
       if (!curIP) return;
@@ -3187,9 +3211,9 @@
     }
     async function loadMLIntern() {
       const [status, models, report] = await Promise.all([
-        get('/api/ml-intern/status'),
-        get('/api/ml-intern/models'),
-        get('/api/ml-intern/reports/latest'),
+        get(`${INTERN}/status`),
+        get(`${INTERN}/models`),
+        get(`${INTERN}/reports/latest`),
       ]);
       if (!status) return;
       const latest = status.latest_training;
@@ -3223,7 +3247,7 @@
     }
     async function manualMLInternRetrain() {
       document.getElementById('mi-action-status').textContent = 'Training candidate…';
-      const r = await post('/api/ml-intern/retrain');
+      const r = await post(`${INTERN}/retrain`);
       if (!r) return;
       if (r.status === 'already_running') {
         toast('ML Intern is already training', 'warn');
@@ -3238,14 +3262,14 @@
     async function approveMLInternModel(modelId) {
       if (!modelId) return;
       document.getElementById('mi-action-status').textContent = 'Approving ' + modelId + '…';
-      const r = await post(`/api/ml-intern/approve-model/${modelId}`);
+      const r = await post(`${INTERN}/approve-model/${modelId}`);
       if (r) toast('Approved active model: ' + modelId, 'ok');
       document.getElementById('mi-action-status').textContent = '';
       await loadMLIntern();
     }
     async function rollbackMLIntern() {
       document.getElementById('mi-action-status').textContent = 'Rolling back model…';
-      const r = await post('/api/ml-intern/rollback');
+      const r = await post(`${INTERN}/rollback`);
       if (r) toast('Rolled back to previous model', 'warn');
       document.getElementById('mi-action-status').textContent = '';
       await loadMLIntern();

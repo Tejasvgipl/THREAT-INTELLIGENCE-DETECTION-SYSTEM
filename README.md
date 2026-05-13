@@ -1,6 +1,6 @@
-# CyberSentinel — AI SOC / SIEM Platform
+# CyberSentinel — Threat Intelligence SIEM Platform
 
-A full-stack, Dockerised AI SOC dashboard for security teams.  
+A full-stack, Dockerised threat intelligence dashboard for SOC teams.
 Built for **Virtual Galaxy Infotech Ltd** · Bank client log analysis.
 
 ---
@@ -13,12 +13,12 @@ cybersentinel/
 ├── .env.example                ← Copy to .env and fill in keys
 │
 ├── frontend/                   ← Single-page dashboard (nginx)
-│   ├── index.html              ← Full SOC dashboard UI
+│   ├── index.html              ← Full threat intel UI
 │   ├── nginx.conf
 │   └── Dockerfile
 │
 ├── backend/                    ← FastAPI REST API
-│   ├── main.py                 ← Log ingestion, IP trail, blocklist, baselines
+│   ├── main.py                 ← Log ingestion, IP trail, blocklist, intel
 │   ├── requirements.txt
 │   └── Dockerfile
 │
@@ -60,7 +60,7 @@ cybersentinel/
 ### 2. Clone / unzip and start
 ```bash
 cd cybersentinel
-cp .env.example .env           # optionally add GROQ_API_KEY for AI explanations
+cp .env.example .env           # optionally add ABUSEIPDB_KEY
 docker compose up --build -d
 ```
 
@@ -68,6 +68,8 @@ docker compose up --build -d
 ```
 http://localhost
 ```
+
+> If port `80` is already in use, open the dashboard at `http://localhost:8888` after adjusting `nginx` service ports in `docker-compose.yml`.
 
 ### 4. Load sample data
 - Go to **Ingest Logs** in the sidebar
@@ -105,6 +107,7 @@ GET  /api/trail/{ip}              Full event trail for an IP
 GET  /api/trail/{ip}/summary      Summary (first/last seen, threat types)
 GET  /api/stats                   Global metrics
 GET  /api/hot-ips                 All high/critical severity IPs
+GET  /api/intel/{ip}              Threat intel (local + AbuseIPDB)
 GET  /api/blocklist               View blocklist
 POST /api/blocklist/add           Block an IP
 DEL  /api/blocklist/{ip}          Unblock an IP
@@ -148,7 +151,30 @@ condition is true:
 
 ## For live/continuous ingestion
 
-### Option A — Folder watcher
+### Option A — Wazuh alerts.json streamer (RECOMMENDED)
+Directly tails Wazuh's `alerts.json` with smart offset tracking:
+- **First run:** ingests entire alert history
+- **After that:** only new alerts are ingested (no duplicates)
+- **Auto-triggers:** ML training + archive after threshold
+
+**As a Docker service:**
+```bash
+# 1. Set the path to your alerts.json in .env
+WAZUH_ALERTS_PATH=/var/ossec/logs/alerts/alerts.json
+
+# 2. Start with the wazuh profile
+docker compose --profile wazuh up -d
+```
+
+**Standalone:**
+```bash
+python scripts/wazuh_watcher.py \
+  --alerts /var/ossec/logs/alerts/alerts.json \
+  --api http://localhost:8000 \
+  --interval 5
+```
+
+### Option B — Folder watcher
 Point your SIEM to export logs to a folder, then run:
 ```bash
 python scripts/watch_and_ingest.py \
@@ -157,7 +183,7 @@ python scripts/watch_and_ingest.py \
   --interval 10
 ```
 
-### Option B — Direct API push
+### Option C — Direct API push
 From your Wazuh / Fortigate log shipper, POST each event:
 ```bash
 curl -X POST http://localhost:8000/api/ingest/log \
@@ -165,13 +191,39 @@ curl -X POST http://localhost:8000/api/ingest/log \
   -d '{"@timestamp":"2026-04-22T09:30:00Z","rule.description":"Login failed","data.ui":"85.11.187.36"}'
 ```
 
-### Option C — Fortigate auto-block integration
+### Option D — Fortigate auto-block integration
 ```bash
 python scripts/fortigate_autoblock.py \
   --cs-api http://localhost:8000 \
   --fg-host 192.168.1.1 \
   --fg-token YOUR_TOKEN \
   --dry-run     # remove --dry-run when ready for real blocks
+```
+
+---
+
+## Hot/Cold Storage (Smart Memory Management)
+
+Redis stays lean while no logs are ever lost:
+
+| Layer | What | Retention |
+|-------|------|-----------|
+| **Redis (Hot)** | Last 200 events/IP + baselines + stats + ML scores | Always in memory |
+| **Disk (Cold)** | ALL older events compressed as `.jsonl.gz` | Preserved forever |
+
+### API endpoints
+```
+POST /api/archive/run                    Archive & trim ALL IP trails
+POST /api/archive/ip/{ip}               Archive & trim single IP
+GET  /api/archive/list                   List archive files with sizes
+GET  /api/archive/search/{ip}?date=...  Search cold archive for old events
+GET  /api/storage/stats                  Redis + disk usage summary
+```
+
+### Configure
+```env
+TRAIL_RETAIN=200          # events to keep in Redis per IP
+WAZUH_ARCHIVE_THRESHOLD=5000  # auto-archive after N new alerts
 ```
 
 ---
@@ -198,10 +250,21 @@ python scripts/fortigate_autoblock.py \
 
 ---
 
+## Adding AbuseIPDB live intel
+
+1. Register free at https://www.abuseipdb.com/register
+2. Copy your API key
+3. Add to `.env`: `ABUSEIPDB_KEY=your_key`
+4. `docker compose restart backend`
+5. Now IP Trail → **+ Intel** shows live reputation scores
+
+---
+
 ## Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| ABUSEIPDB_KEY | demo | AbuseIPDB API key for live threat intel |
 | REDIS_HOST | redis | Redis hostname |
 | REDIS_PORT | 6379 | Redis port |
 | LOG_LEVEL | INFO | Backend log level |
@@ -211,6 +274,12 @@ python scripts/fortigate_autoblock.py \
 | ML_INTERN_NEW_LOG_THRESHOLD | 10000 | Data-volume retraining threshold |
 | ML_INTERN_DRIFT_THRESHOLD | 0.35 | Distribution drift threshold |
 | ML_INTERN_MIN_TRAINING_IPS | 5 | Minimum IP feature rows needed to train |
+| TRAIL_RETAIN | 200 | Events to keep in Redis per IP (rest archived to disk) |
+| WAZUH_ALERTS_PATH | ./sample-data/alerts.json | Host path to Wazuh alerts.json |
+| WAZUH_POLL_INTERVAL | 5 | Seconds between tail checks |
+| WAZUH_BATCH_SIZE | 200 | Alerts per batch to backend |
+| WAZUH_TRAIN_THRESHOLD | 500 | Trigger ML train after N new alerts |
+| WAZUH_ARCHIVE_THRESHOLD | 5000 | Trigger archive/trim after N new alerts |
 
 ---
 
