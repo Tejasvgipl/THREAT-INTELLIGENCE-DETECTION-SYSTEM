@@ -1,0 +1,68 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node/frontend dependencies and generated output
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+frontend/dist/
+frontend/build/
+
+# Docker and service runtime data
+*.pid
+*.log
+logs/
+tmp/
+temp/
+redis-data/
+redis_data/
+dump.rdb
+appendonly.aof
+
+# ML/runtime artifacts generated during local use
+models/
+ml-engine/models/
+*.pkl
+*.joblib
+
+# Uploaded/exported local data
+uploads/
+exports/
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor, OS, and local tooling noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+.codex
+
+# Accidentally created shell brace-expansion directory
+{frontend,backend,ml-engine,redis-config,nginx,scripts,sample-data}/

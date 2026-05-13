@@ -1,0 +1,138 @@
+services:
+  redis:
+    build: ./redis-config
+    container_name: cs_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: cs_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ABUSEIPDB_KEY=${ABUSEIPDB_KEY:-demo}
+      - AI_API_KEY=${AI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-llama-3.3-70b-versatile}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.groq.com/openai/v1/chat/completions}
+      - LOG_LEVEL=INFO
+      - ARCHIVE_DIR=/app/archive
+      - TRAIL_RETAIN=${TRAIL_RETAIN:-200}
+    volumes:
+      - ./sample-data:/app/sample-data
+      - ./scripts:/app/scripts
+      - archive_data:/app/archive
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ml-engine:
+    build: ./ml-engine
+    container_name: cs_ml
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_RETRAIN_HOURS=24
+    volumes:
+      - ml_models:/app/models
+      - ./sample-data:/app/sample-data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ml-intern:
+    build: ./ml-intern
+    container_name: cs_ml_intern
+    ports:
+      - "8002:8002"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ML_INTERN_CHECK_MINUTES=${ML_INTERN_CHECK_MINUTES:-5}
+      - ML_INTERN_TIME_HOURS=${ML_INTERN_TIME_HOURS:-24}
+      - ML_INTERN_NEW_LOG_THRESHOLD=${ML_INTERN_NEW_LOG_THRESHOLD:-10000}
+      - ML_INTERN_DRIFT_THRESHOLD=${ML_INTERN_DRIFT_THRESHOLD:-0.35}
+      - ML_INTERN_MIN_TRAINING_IPS=${ML_INTERN_MIN_TRAINING_IPS:-5}
+      - ML_INTERN_MODEL_DIR=/app/models
+    volumes:
+      - ml_models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: cs_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+      - ml-engine
+    restart: unless-stopped
+
+  nginx:
+    build: ./nginx
+    container_name: cs_nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+  # ── Wazuh alerts.json Streamer ──────────────────────────────────────────
+  # Reads alerts.json as READ-ONLY. Nothing gets modified on the server.
+  # Smart filter: drops noise (level <4), samples moderate, keeps important.
+  #
+  # Start: docker compose --profile wazuh up --build -d
+
+  wazuh-watcher:
+    build: ./scripts
+    container_name: cs_wazuh_watcher
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WAZUH_ALERTS_PATH=/wazuh/alerts.json
+      - WAZUH_API_URL=http://backend:8000
+      - WAZUH_POLL_INTERVAL=${WAZUH_POLL_INTERVAL:-5}
+      - WAZUH_BATCH_SIZE=${WAZUH_BATCH_SIZE:-200}
+      - WAZUH_OFFSET_FILE=/app/data/wazuh_offset.json
+      - WAZUH_TRAIN_THRESHOLD=${WAZUH_TRAIN_THRESHOLD:-500}
+      - WAZUH_ARCHIVE_THRESHOLD=${WAZUH_ARCHIVE_THRESHOLD:-5000}
+      - WAZUH_MIN_LEVEL=${WAZUH_MIN_LEVEL:-4}
+      - WAZUH_SAMPLE_BELOW=${WAZUH_SAMPLE_BELOW:-7}
+      - WAZUH_SAMPLE_RATE=${WAZUH_SAMPLE_RATE:-10}
+      - WAZUH_MAX_PER_MINUTE=${WAZUH_MAX_PER_MINUTE:-500}
+    volumes:
+      # READ-ONLY mount of alerts.json — cannot modify the original
+      - ${WAZUH_ALERTS_PATH:-/var/ossec/logs/alerts/alerts.json}:/wazuh/alerts.json:ro
+      # Persist offset between restarts
+      - watcher_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    profiles:
+      - wazuh
+
+volumes:
+  redis_data:
+  ml_models:
+  archive_data:
+  watcher_data:
