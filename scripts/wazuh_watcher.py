@@ -154,7 +154,7 @@ def map_wazuh_alert(raw_alert: dict) -> dict:
 def send_batch(alerts: list) -> bool:
     try:
         resp = requests.post(
-            f"{API_BASE}/api/ingest/bulk", json=alerts, timeout=60,
+            f"{API_BASE}/api/ingest/bulk", json={"logs": alerts}, timeout=60,
             headers={"Content-Type": "application/json"},
         )
         if resp.status_code != 200:
