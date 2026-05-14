@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CyberSentinel — Wazuh alerts.json Streamer
+CyberSentinel — Wazuh alerts.json Streamer v2
 
 Tails Wazuh's alerts.json locally with byte-offset tracking.
 Deployed ON the Wazuh server inside Docker — reads alerts.json as read-only mount.
@@ -11,8 +11,8 @@ Smart filtering to handle high-volume logs (1000s/min):
   - Level 4-6:  SAMPLE 1 in N (moderate — auth info, policy changes)
   - Level 7+:   KEEP ALL (important — attacks, brute force, exploits)
 
-First run:  reads ALL existing alerts (full history)
-After that: reads ONLY new alerts since last position
+First run:  reads ALL existing alerts — NO rate limit, processes everything
+After that: reads ONLY new alerts with rate limiting
 """
 import json
 import os
@@ -40,6 +40,9 @@ MIN_LEVEL = int(os.getenv("WAZUH_MIN_LEVEL", "4"))
 SAMPLE_BELOW = int(os.getenv("WAZUH_SAMPLE_BELOW", "7"))
 SAMPLE_RATE = int(os.getenv("WAZUH_SAMPLE_RATE", "10"))
 MAX_PER_MINUTE = int(os.getenv("WAZUH_MAX_PER_MINUTE", "500"))
+
+# Chunk size: how many LINES to read per cycle (prevents reading 2M lines at once)
+CHUNK_LINES = int(os.getenv("WAZUH_CHUNK_LINES", "50000"))
 
 # ── filter stats ─────────────────────────────────────────────────────────────
 filter_stats = defaultdict(int)
@@ -104,17 +107,23 @@ def load_offset() -> dict:
     if OFFSET_FILE.exists():
         try:
             with open(OFFSET_FILE) as f:
-                return json.load(f)
-        except Exception:
-            pass
+                data = json.load(f)
+                print(f"[Offset] Loaded: byte_offset={data.get('byte_offset', 0):,}, "
+                      f"total_ingested={data.get('total_ingested', 0):,}")
+                return data
+        except Exception as e:
+            print(f"[Offset] Failed to load: {e}")
     return {"byte_offset": 0, "lines_read": 0, "last_run": None, "total_ingested": 0}
 
 
 def save_offset(state: dict):
-    OFFSET_FILE.parent.mkdir(parents=True, exist_ok=True)
-    state["last_run"] = datetime.now(timezone.utc).isoformat()
-    with open(OFFSET_FILE, "w") as f:
-        json.dump(state, f, indent=2)
+    try:
+        OFFSET_FILE.parent.mkdir(parents=True, exist_ok=True)
+        state["last_run"] = datetime.now(timezone.utc).isoformat()
+        with open(OFFSET_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"  ✗ OFFSET SAVE FAILED: {e}")
 
 
 # ── wazuh field mapping ─────────────────────────────────────────────────────
@@ -148,7 +157,10 @@ def send_batch(alerts: list) -> bool:
             f"{API_BASE}/api/ingest/bulk", json=alerts, timeout=60,
             headers={"Content-Type": "application/json"},
         )
-        return resp.status_code == 200
+        if resp.status_code != 200:
+            print(f"  ✗ Backend returned {resp.status_code}: {resp.text[:200]}")
+            return False
+        return True
     except requests.ConnectionError:
         print(f"  ✗ Cannot connect to {API_BASE}")
         return False
@@ -208,9 +220,10 @@ def tail_alerts():
 
     if is_first_run:
         print(f"[Watcher] FIRST RUN — will ingest entire alerts.json history")
+        print(f"[Watcher] Rate limiting DISABLED for first run (full speed)")
     else:
         print(f"[Watcher] Resuming from offset {state['byte_offset']:,} "
-              f"({state['lines_read']:,} lines read before)")
+              f"({state['lines_read']:,} lines, {state['total_ingested']:,} ingested)")
 
     # Wait for file to exist
     if not ALERTS_PATH.exists():
@@ -222,6 +235,7 @@ def tail_alerts():
     session_ingested = 0
     since_last_train = 0
     since_last_archive = 0
+    consecutive_errors = 0
 
     while True:
         try:
@@ -234,30 +248,46 @@ def tail_alerts():
         if file_size < state["byte_offset"]:
             print(f"[Watcher] File rotated — resetting offset")
             state["byte_offset"] = 0
+            save_offset(state)
 
         if file_size == state["byte_offset"]:
+            if is_first_run and session_ingested > 0:
+                # We've caught up — first run is done
+                print(f"\n[Watcher] ═══ FIRST RUN COMPLETE ═══")
+                print(f"[Watcher] Ingested {session_ingested:,} historical alerts")
+                print(f"[Watcher] Building baselines + training ML model...")
+                trigger_baseline_build()
+                trigger_ml_train()
+                trigger_archive()
+                is_first_run = False
+                since_last_train = 0
+                since_last_archive = 0
+                print(f"[Watcher] Now watching for new alerts every {INTERVAL}s\n")
             time.sleep(INTERVAL)
             continue
 
-        # Read new lines
+        # ── Read a CHUNK of lines (not the entire file) ─────────────────
+        chunk_kept = 0
+        chunk_dropped = 0
+        chunk_rate_limited = 0
+        chunk_lines = 0
+        chunk_errors = 0
         new_alerts_batch = []
-        new_offset = state["byte_offset"]
-        cycle_total = 0
-        cycle_kept = 0
-        cycle_dropped = 0
+        last_good_offset = state["byte_offset"]
 
         try:
             with open(ALERTS_PATH, "r", encoding="utf-8", errors="replace") as f:
                 f.seek(state["byte_offset"])
 
-                while True:
+                for _ in range(CHUNK_LINES):
                     line = f.readline()
                     if not line:
-                        break
+                        break  # EOF
                     if not line.endswith("\n"):
                         break  # incomplete line, wait for next cycle
 
-                    new_offset = f.tell()
+                    last_good_offset = f.tell()
+                    chunk_lines += 1
                     line = line.strip()
                     if not line:
                         continue
@@ -265,19 +295,18 @@ def tail_alerts():
                     try:
                         raw_alert = json.loads(line)
                     except json.JSONDecodeError:
+                        chunk_errors += 1
                         continue
-
-                    cycle_total += 1
 
                     # ── Smart filtering ──
                     decision = should_ingest(raw_alert)
                     if decision == "drop":
-                        cycle_dropped += 1
-                        filter_stats["dropped"] += 1
+                        chunk_dropped += 1
                         continue
 
-                    if not check_rate_limit():
-                        filter_stats["rate_limited"] += 1
+                    # Rate limit: SKIP during first run, APPLY after
+                    if not is_first_run and not check_rate_limit():
+                        chunk_rate_limited += 1
                         continue
 
                     if decision == "sample":
@@ -287,21 +316,26 @@ def tail_alerts():
 
                     mapped = map_wazuh_alert(raw_alert)
                     new_alerts_batch.append(mapped)
-                    cycle_kept += 1
+                    chunk_kept += 1
 
                     # Send in batches
                     if len(new_alerts_batch) >= BATCH_SIZE:
                         if send_batch(new_alerts_batch):
-                            state["byte_offset"] = new_offset
+                            state["byte_offset"] = last_good_offset
                             state["lines_read"] += len(new_alerts_batch)
                             state["total_ingested"] += len(new_alerts_batch)
                             session_ingested += len(new_alerts_batch)
                             since_last_train += len(new_alerts_batch)
                             since_last_archive += len(new_alerts_batch)
                             save_offset(state)
-                            ts = datetime.now().strftime("%H:%M:%S")
-                            print(f"  [{ts}] Sent {len(new_alerts_batch)} "
-                                  f"(total: {state['total_ingested']:,})")
+                            consecutive_errors = 0
+                        else:
+                            consecutive_errors += 1
+                            if consecutive_errors >= 5:
+                                print(f"  ✗ 5 consecutive send failures — waiting 30s")
+                                time.sleep(30)
+                                consecutive_errors = 0
+                            break  # Stop reading, retry from saved offset
                         new_alerts_batch = []
 
         except Exception as e:
@@ -309,23 +343,34 @@ def tail_alerts():
             time.sleep(INTERVAL)
             continue
 
-        # Log filter stats
-        if cycle_total > 0:
-            pct = round(cycle_dropped / cycle_total * 100)
-            ts = datetime.now().strftime("%H:%M:%S")
-            print(f"  [{ts}] Filter: {cycle_total} read → {cycle_kept} kept, "
-                  f"{cycle_dropped} dropped ({pct}% noise)")
-
-        # Send remaining
+        # Send remaining batch
         if new_alerts_batch:
             if send_batch(new_alerts_batch):
-                state["byte_offset"] = new_offset
+                state["byte_offset"] = last_good_offset
                 state["lines_read"] += len(new_alerts_batch)
                 state["total_ingested"] += len(new_alerts_batch)
                 session_ingested += len(new_alerts_batch)
                 since_last_train += len(new_alerts_batch)
                 since_last_archive += len(new_alerts_batch)
                 save_offset(state)
+                consecutive_errors = 0
+            else:
+                consecutive_errors += 1
+        elif chunk_lines > 0:
+            # Even if nothing was kept (all filtered), advance the offset
+            state["byte_offset"] = last_good_offset
+            save_offset(state)
+
+        # Log progress
+        if chunk_lines > 0:
+            ts = datetime.now().strftime("%H:%M:%S")
+            pct_done = ""
+            if file_size > 0:
+                pct_done = f" | {state['byte_offset']/file_size*100:.1f}% of file"
+            rate_msg = f", {chunk_rate_limited} rate-limited" if chunk_rate_limited > 0 else ""
+            print(f"  [{ts}] Chunk: {chunk_lines:,} lines → {chunk_kept} kept, "
+                  f"{chunk_dropped:,} dropped{rate_msg} "
+                  f"(total ingested: {state['total_ingested']:,}{pct_done})")
 
         # Auto-triggers
         if since_last_train >= TRAIN_THRESHOLD:
@@ -339,33 +384,25 @@ def tail_alerts():
             trigger_archive()
             since_last_archive = 0
 
-        # First run complete
-        if is_first_run and session_ingested > 0 and new_offset >= file_size:
-            print(f"\n[Watcher] ═══ FIRST RUN COMPLETE ═══")
-            print(f"[Watcher] Ingested {session_ingested:,} historical alerts")
-            trigger_baseline_build()
-            trigger_ml_train()
-            trigger_archive()
-            is_first_run = False
-            since_last_train = 0
-            since_last_archive = 0
-            print(f"[Watcher] Now watching for new alerts every {INTERVAL}s\n")
-
-        time.sleep(INTERVAL)
+        # During first run, don't sleep between chunks — go fast
+        if is_first_run:
+            time.sleep(0.1)  # tiny pause to not hog CPU
+        else:
+            time.sleep(INTERVAL)
 
 
 if __name__ == "__main__":
     print("╔══════════════════════════════════════════════════════════╗")
-    print("║   CyberSentinel — Wazuh alerts.json Streamer           ║")
+    print("║   CyberSentinel — Wazuh alerts.json Streamer v2        ║")
     print("╚══════════════════════════════════════════════════════════╝")
     print(f"  File       : {ALERTS_PATH}")
     print(f"  Backend    : {API_BASE}")
-    print(f"  Interval   : {INTERVAL}s | Batch: {BATCH_SIZE}")
+    print(f"  Interval   : {INTERVAL}s | Batch: {BATCH_SIZE} | Chunk: {CHUNK_LINES:,} lines")
     print(f"  ── Smart Filter ──")
     print(f"  Drop       : level <{MIN_LEVEL} (noise)")
     print(f"  Sample     : level {MIN_LEVEL}-{SAMPLE_BELOW-1} (1 in {SAMPLE_RATE})")
     print(f"  Keep all   : level {SAMPLE_BELOW}+")
-    print(f"  Rate limit : {MAX_PER_MINUTE}/min" if MAX_PER_MINUTE > 0 else "  Rate limit : unlimited")
+    print(f"  Rate limit : {MAX_PER_MINUTE}/min (DISABLED during first run)" if MAX_PER_MINUTE > 0 else "  Rate limit : unlimited")
     print()
 
     wait_for_backend()
