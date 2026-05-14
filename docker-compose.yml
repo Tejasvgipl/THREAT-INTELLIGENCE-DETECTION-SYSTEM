@@ -3,7 +3,7 @@ services:
     build: ./redis-config
     container_name: cs_redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -17,7 +17,7 @@ services:
     build: ./backend
     container_name: cs_backend
     ports:
-      - "8000:8000"
+      - "8010:8000"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -41,7 +41,7 @@ services:
     build: ./ml-engine
     container_name: cs_ml
     ports:
-      - "8001:8001"
+      - "8011:8001"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -58,7 +58,7 @@ services:
     build: ./ml-intern
     container_name: cs_ml_intern
     ports:
-      - "8002:8002"
+      - "8012:8002"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -79,7 +79,7 @@ services:
     build: ./frontend
     container_name: cs_frontend
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       - backend
       - ml-engine
@@ -89,7 +89,7 @@ services:
     build: ./nginx
     container_name: cs_nginx
     ports:
-      - "80:80"
+      - "8888:80"
     depends_on:
       - frontend
       - backend

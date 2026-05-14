@@ -2459,11 +2459,12 @@
     let ML = '/api/ml';
     let INTERN = '/api/ml-intern';
 
-    // Auto-detect if running outside the main Nginx gateway (e.g. Live Server, direct file, or port 3000)
-    if (window.location.protocol === 'file:' || ['3000', '5500', '8080'].includes(window.location.port)) {
-      API = 'http://localhost:8000/api';
-      ML = 'http://localhost:8001/api/ml';
-      INTERN = 'http://localhost:8002'; // ml-intern runs on root paths internally
+    // Auto-detect if running outside the main Nginx gateway (e.g. Live Server, direct file, or port 3001)
+    if (window.location.protocol === 'file:' || ['3000', '3001', '5500', '8080'].includes(window.location.port)) {
+      const host = window.location.hostname || 'localhost';
+      API = `http://${host}:8010/api`;
+      ML = `http://${host}:8011/api/ml`;
+      INTERN = `http://${host}:8012`; // ml-intern runs on root paths internally
     }
 
     let charts = {}, curIP = '';

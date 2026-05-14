@@ -10,7 +10,7 @@ from typing import Optional
 import pandas as pd
 import redis.asyncio as aioredis
 import httpx
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="CyberSentinel API", version="2.1.0")
@@ -487,7 +487,14 @@ async def ingest_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
 
 
 @app.post("/api/ingest/bulk")
-async def ingest_bulk(background_tasks: BackgroundTasks, logs: list):
+async def ingest_bulk(background_tasks: BackgroundTasks, request: Request):
+    body = await request.json()
+    if isinstance(body, list):
+        logs = body
+    elif isinstance(body, dict) and "logs" in body:
+        logs = body["logs"]
+    else:
+        raise HTTPException(400, "Expected a list or {logs: [...]}")
     async def process():
         r = await get_redis()
         for log in logs:
