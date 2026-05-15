@@ -39,6 +39,7 @@ CHECK_MINUTES = int(os.getenv("ML_INTERN_CHECK_MINUTES", "5"))
 TIME_TRIGGER_HOURS = int(os.getenv("ML_INTERN_TIME_HOURS", "24"))
 NEW_LOG_THRESHOLD = int(os.getenv("ML_INTERN_NEW_LOG_THRESHOLD", "10000"))
 DRIFT_THRESHOLD = float(os.getenv("ML_INTERN_DRIFT_THRESHOLD", "0.35"))
+STRONG_DRIFT_THRESHOLD = float(os.getenv("ML_INTERN_STRONG_DRIFT_THRESHOLD", str(DRIFT_THRESHOLD)))
 MIN_TRAINING_IPS = int(os.getenv("ML_INTERN_MIN_TRAINING_IPS", "5"))
 
 META_KEY = "ml_intern:models"
@@ -264,6 +265,8 @@ async def active_model_metadata(r: aioredis.Redis) -> Optional[dict]:
 
 async def compute_trigger_state(r: aioredis.Redis, features: Optional[list[dict]] = None) -> dict:
     last_train = await latest_training_metadata(r)
+    models = await get_model_metadata(r)
+    pending_candidate_count = len([m for m in models if m.get("status") == "candidate"])
     total_logs = await current_log_count(r)
     current_summary = summarize_distribution(features or await collect_training_features(r))
 
@@ -279,12 +282,20 @@ async def compute_trigger_state(r: aioredis.Redis, features: Optional[list[dict]
     time_trigger = last_time is None or hours_since_train >= TIME_TRIGGER_HOURS
     data_trigger = new_logs_count >= NEW_LOG_THRESHOLD
     drift_trigger = drift_score >= DRIFT_THRESHOLD
+    strong_drift_trigger = drift_score >= STRONG_DRIFT_THRESHOLD
+    initial_model_needed = not models
+    pending_candidate_exists = pending_candidate_count > 0
+    should_retrain = initial_model_needed or (not pending_candidate_exists and strong_drift_trigger)
 
     return {
-        "should_retrain": bool(time_trigger or data_trigger or drift_trigger),
+        "should_retrain": should_retrain,
         "time_trigger": time_trigger,
         "data_trigger": data_trigger,
         "drift_trigger": drift_trigger,
+        "strong_drift_trigger": strong_drift_trigger,
+        "initial_model_needed": initial_model_needed,
+        "pending_candidate_exists": pending_candidate_exists,
+        "pending_candidate_count": pending_candidate_count,
         "hours_since_train": round(hours_since_train, 2) if hours_since_train is not None else None,
         "new_logs_count": new_logs_count,
         "drift_score": drift_score,
@@ -293,6 +304,7 @@ async def compute_trigger_state(r: aioredis.Redis, features: Optional[list[dict]
             "time_hours": TIME_TRIGGER_HOURS,
             "new_logs": NEW_LOG_THRESHOLD,
             "drift": DRIFT_THRESHOLD,
+            "strong_drift": STRONG_DRIFT_THRESHOLD,
             "check_minutes": CHECK_MINUTES,
         },
     }

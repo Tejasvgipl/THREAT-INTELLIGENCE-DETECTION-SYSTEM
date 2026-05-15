@@ -2324,8 +2324,8 @@
         <div class="term-panel">
           <div class="term-title">What ML Intern controls</div>
           <div class="term-grid">
-            <div class="term"><b>Hybrid retraining</b> checks time, new log volume, and drift before creating a new
-              candidate model.</div>
+            <div class="term"><b>Hybrid retraining</b> watches time, log volume, and drift, but creates a candidate only
+              when drift is strong or no model exists.</div>
             <div class="term"><b>Candidate first</b> means ML Intern never deploys a model automatically. It trains,
               evaluates, and waits for analyst approval.</div>
             <div class="term"><b>Rollback</b> restores the previous approved model if the new model behaves badly.</div>
@@ -3173,8 +3173,8 @@
       return `<div class="mi-trigger-panel">
         <div class="mi-trigger-row">${triggerBadge('Time', check.time_trigger)}<span>${check.hours_since_train ?? 'never'} hours since train · threshold ${thresholds.time_hours ?? '—'}h</span></div>
         <div class="mi-trigger-row">${triggerBadge('Data', check.data_trigger)}<span>${fmtNumber(check.new_logs_count)} new logs · threshold ${fmtNumber(thresholds.new_logs)}</span></div>
-        <div class="mi-trigger-row">${triggerBadge('Drift', check.drift_trigger)}<span>score ${check.drift_score ?? '—'} · threshold ${thresholds.drift ?? '—'}</span></div>
-        <div class="mi-decision ${check.should_retrain ? 'on' : 'off'}">${check.should_retrain ? 'Retraining condition is currently TRUE' : 'No retraining needed right now'}</div>
+        <div class="mi-trigger-row">${triggerBadge('Drift', check.strong_drift_trigger || check.drift_trigger)}<span>score ${check.drift_score ?? '—'} · strong threshold ${thresholds.strong_drift ?? thresholds.drift ?? '—'}</span></div>
+        <div class="mi-decision ${check.should_retrain ? 'on' : 'off'}">${check.should_retrain ? 'Candidate creation condition is TRUE' : check.pending_candidate_exists ? 'Candidate already waiting for review' : 'No candidate needed right now'}</div>
       </div>`;
     }
     function renderMLInternModels(models = [], activeId = null) {
