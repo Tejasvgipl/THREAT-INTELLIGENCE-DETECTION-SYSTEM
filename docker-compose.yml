@@ -108,6 +108,7 @@ services:
       - PYTHONUNBUFFERED=1
       - WAZUH_ALERTS_PATH=/wazuh/alerts.json
       - WAZUH_API_URL=http://backend:8000
+      - WAZUH_ML_API_URL=http://ml-engine:8001
       - WAZUH_POLL_INTERVAL=${WAZUH_POLL_INTERVAL:-5}
       - WAZUH_BATCH_SIZE=${WAZUH_BATCH_SIZE:-200}
       - WAZUH_OFFSET_FILE=/app/data/wazuh_offset.json
@@ -117,6 +118,7 @@ services:
       - WAZUH_SAMPLE_BELOW=${WAZUH_SAMPLE_BELOW:-7}
       - WAZUH_SAMPLE_RATE=${WAZUH_SAMPLE_RATE:-10}
       - WAZUH_MAX_PER_MINUTE=${WAZUH_MAX_PER_MINUTE:-500}
+      - WAZUH_STALE_SECONDS=${WAZUH_STALE_SECONDS:-600}
     volumes:
       # READ-ONLY mount of alerts.json — cannot modify the original
       - ${WAZUH_ALERTS_PATH:-/var/ossec/logs/alerts/alerts.json}:/wazuh/alerts.json:ro

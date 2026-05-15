@@ -29,6 +29,7 @@ import requests
 
 ALERTS_PATH = Path(os.getenv("WAZUH_ALERTS_PATH", "/var/ossec/logs/alerts/alerts.json"))
 API_BASE = os.getenv("WAZUH_API_URL", "http://backend:8000").rstrip("/")
+ML_API_BASE = os.getenv("WAZUH_ML_API_URL", "http://ml-engine:8001").rstrip("/")
 OFFSET_FILE = Path(os.getenv("WAZUH_OFFSET_FILE", "/app/data/wazuh_offset.json"))
 INTERVAL = int(os.getenv("WAZUH_POLL_INTERVAL", "5"))
 BATCH_SIZE = int(os.getenv("WAZUH_BATCH_SIZE", "200"))
@@ -40,6 +41,7 @@ MIN_LEVEL = int(os.getenv("WAZUH_MIN_LEVEL", "4"))
 SAMPLE_BELOW = int(os.getenv("WAZUH_SAMPLE_BELOW", "7"))
 SAMPLE_RATE = int(os.getenv("WAZUH_SAMPLE_RATE", "10"))
 MAX_PER_MINUTE = int(os.getenv("WAZUH_MAX_PER_MINUTE", "500"))
+STALE_SECONDS = int(os.getenv("WAZUH_STALE_SECONDS", "600"))
 
 # Chunk size: how many LINES to read per cycle (prevents reading 2M lines at once)
 CHUNK_LINES = int(os.getenv("WAZUH_CHUNK_LINES", "50000"))
@@ -151,7 +153,7 @@ def map_wazuh_alert(raw_alert: dict) -> dict:
 
 # ── API calls ────────────────────────────────────────────────────────────────
 
-def send_batch(alerts: list) -> bool:
+def send_batch(alerts: list) -> tuple[bool, int]:
     try:
         resp = requests.post(
             f"{API_BASE}/api/ingest/bulk", json={"logs": alerts}, timeout=60,
@@ -159,19 +161,23 @@ def send_batch(alerts: list) -> bool:
         )
         if resp.status_code != 200:
             print(f"  ✗ Backend returned {resp.status_code}: {resp.text[:200]}")
-            return False
-        return True
+            return False, 0
+        try:
+            data = resp.json()
+            return True, int(data.get("saved", len(alerts)))
+        except Exception:
+            return True, len(alerts)
     except requests.ConnectionError:
         print(f"  ✗ Cannot connect to {API_BASE}")
-        return False
+        return False, 0
     except Exception as e:
         print(f"  ✗ Batch error: {e}")
-        return False
+        return False, 0
 
 
 def trigger_ml_train():
     try:
-        resp = requests.post(f"{API_BASE}/api/ml/train", timeout=120)
+        resp = requests.post(f"{ML_API_BASE}/api/ml/train", timeout=120)
         data = resp.json()
         print(f"  🧠 ML train: {data.get('status')} — {data.get('ip_count', '?')} IPs, "
               f"{data.get('anomalies', '?')} anomalies")
@@ -236,6 +242,7 @@ def tail_alerts():
     since_last_train = 0
     since_last_archive = 0
     consecutive_errors = 0
+    last_progress_ts = time.time()
 
     while True:
         try:
@@ -249,6 +256,11 @@ def tail_alerts():
             print(f"[Watcher] File rotated — resetting offset")
             state["byte_offset"] = 0
             save_offset(state)
+            last_progress_ts = time.time()
+
+        if file_size > state["byte_offset"] and time.time() - last_progress_ts > STALE_SECONDS:
+            print(f"[Watcher] Stale offset for {STALE_SECONDS}s while file has unread data — exiting for Docker restart")
+            sys.exit(2)
 
         if file_size == state["byte_offset"]:
             if is_first_run and session_ingested > 0:
@@ -320,14 +332,16 @@ def tail_alerts():
 
                     # Send in batches
                     if len(new_alerts_batch) >= BATCH_SIZE:
-                        if send_batch(new_alerts_batch):
+                        sent, saved = send_batch(new_alerts_batch)
+                        if sent:
                             state["byte_offset"] = last_good_offset
                             state["lines_read"] += len(new_alerts_batch)
-                            state["total_ingested"] += len(new_alerts_batch)
-                            session_ingested += len(new_alerts_batch)
-                            since_last_train += len(new_alerts_batch)
-                            since_last_archive += len(new_alerts_batch)
+                            state["total_ingested"] += saved
+                            session_ingested += saved
+                            since_last_train += saved
+                            since_last_archive += saved
                             save_offset(state)
+                            last_progress_ts = time.time()
                             consecutive_errors = 0
                         else:
                             consecutive_errors += 1
@@ -345,14 +359,16 @@ def tail_alerts():
 
         # Send remaining batch
         if new_alerts_batch:
-            if send_batch(new_alerts_batch):
+            sent, saved = send_batch(new_alerts_batch)
+            if sent:
                 state["byte_offset"] = last_good_offset
                 state["lines_read"] += len(new_alerts_batch)
-                state["total_ingested"] += len(new_alerts_batch)
-                session_ingested += len(new_alerts_batch)
-                since_last_train += len(new_alerts_batch)
-                since_last_archive += len(new_alerts_batch)
+                state["total_ingested"] += saved
+                session_ingested += saved
+                since_last_train += saved
+                since_last_archive += saved
                 save_offset(state)
+                last_progress_ts = time.time()
                 consecutive_errors = 0
             else:
                 consecutive_errors += 1
@@ -360,6 +376,7 @@ def tail_alerts():
             # Even if nothing was kept (all filtered), advance the offset
             state["byte_offset"] = last_good_offset
             save_offset(state)
+            last_progress_ts = time.time()
 
         # Log progress
         if chunk_lines > 0:
@@ -397,6 +414,7 @@ if __name__ == "__main__":
     print("╚══════════════════════════════════════════════════════════╝")
     print(f"  File       : {ALERTS_PATH}")
     print(f"  Backend    : {API_BASE}")
+    print(f"  ML Engine  : {ML_API_BASE}")
     print(f"  Interval   : {INTERVAL}s | Batch: {BATCH_SIZE} | Chunk: {CHUNK_LINES:,} lines")
     print(f"  ── Smart Filter ──")
     print(f"  Drop       : level <{MIN_LEVEL} (noise)")

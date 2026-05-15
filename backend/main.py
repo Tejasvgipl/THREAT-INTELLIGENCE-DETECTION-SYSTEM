@@ -414,10 +414,10 @@ async def save_alerts(r: aioredis.Redis, ip: str, alerts: list):
 
 # ── ingestion ─────────────────────────────────────────────────────────────────
 
-async def ingest_log_row(r: aioredis.Redis, row: dict):
+async def ingest_log_row(r: aioredis.Redis, row: dict) -> bool:
     src_ip = extract_src_ip(row)
     if not src_ip:
-        return
+        return False
 
     classification = classify_event(row)
     ts = row.get("@timestamp", datetime.now(timezone.utc).isoformat())
@@ -466,6 +466,8 @@ async def ingest_log_row(r: aioredis.Redis, row: dict):
     if total and int(total) % 50 == 0:
         await build_baseline(r, src_ip)
 
+    return True
+
 
 @app.post("/api/ingest/csv")
 async def ingest_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -487,7 +489,7 @@ async def ingest_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
 
 
 @app.post("/api/ingest/bulk")
-async def ingest_bulk(background_tasks: BackgroundTasks, request: Request):
+async def ingest_bulk(request: Request):
     body = await request.json()
     if isinstance(body, list):
         logs = body
@@ -495,12 +497,15 @@ async def ingest_bulk(background_tasks: BackgroundTasks, request: Request):
         logs = body["logs"]
     else:
         raise HTTPException(400, "Expected a list or {logs: [...]}")
-    async def process():
-        r = await get_redis()
-        for log in logs:
-            await ingest_log_row(r, log)
-    background_tasks.add_task(process)
-    return {"status":"ingesting","count":len(logs)}
+    r = await get_redis()
+    saved = 0
+    skipped = 0
+    for log in logs:
+        if await ingest_log_row(r, log):
+            saved += 1
+        else:
+            skipped += 1
+    return {"status":"ok","count":len(logs),"saved":saved,"skipped":skipped}
 
 
 @app.post("/api/ingest/log")
