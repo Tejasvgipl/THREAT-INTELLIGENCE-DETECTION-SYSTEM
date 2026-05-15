@@ -198,6 +198,32 @@ def train_isolation_forest(features: list) -> tuple:
     model.fit(Xs)
     return model, scaler
 
+
+async def score_and_cache_features(r: aioredis.Redis, model, scaler, features: list[dict]) -> list[dict]:
+    if not features:
+        return []
+
+    X  = np.array([[f.get(c,0) for c in FEATURE_COLS] for f in features])
+    Xs = scaler.transform(X)
+    raw_scores = model.decision_function(Xs)
+
+    anomalies = []
+    for i, f in enumerate(features):
+        score  = float(raw_scores[i])
+        is_anom = bool(model.predict(Xs[i:i+1])[0] == -1)
+        risk    = max(0, min(100, int((1-(score+0.5))*100)))
+
+        baseline_alerts = f.get("baseline_alerts", 0)
+        critical_alerts = f.get("critical_alerts", 0)
+        risk = min(100, risk + baseline_alerts * 2 + critical_alerts * 5)
+
+        await r.set(f"ml:score:{f['ip']}",
+            json.dumps({"anomaly_score":round(score,4),"is_anomaly":is_anom,"risk_score":risk}))
+        if is_anom:
+            anomalies.append({"ip":f["ip"],"score":round(score,4),"risk":risk})
+
+    return anomalies
+
 @app.post("/api/ml/train")
 async def train_model():
     r        = await get_redis()
@@ -212,25 +238,7 @@ async def train_model():
     joblib.dump(model,  MODEL_DIR/"isolation_forest.pkl")
     joblib.dump(scaler, MODEL_DIR/"scaler.pkl")
 
-    X  = np.array([[f.get(c,0) for c in FEATURE_COLS] for f in features])
-    Xs = scaler.transform(X)
-    raw_scores = model.decision_function(Xs)
-
-    anomalies = []
-    for i, f in enumerate(features):
-        score  = float(raw_scores[i])
-        is_anom = bool(model.predict(Xs[i:i+1])[0] == -1)
-        risk    = max(0, min(100, int((1-(score+0.5))*100)))
-
-        # Boost risk score based on baseline alerts
-        baseline_alerts = f.get("baseline_alerts", 0)
-        critical_alerts = f.get("critical_alerts", 0)
-        risk = min(100, risk + baseline_alerts * 2 + critical_alerts * 5)
-
-        await r.setex(f"ml:score:{f['ip']}", 3600,
-            json.dumps({"anomaly_score":round(score,4),"is_anomaly":is_anom,"risk_score":risk}))
-        if is_anom:
-            anomalies.append({"ip":f["ip"],"score":round(score,4),"risk":risk})
+    anomalies = await score_and_cache_features(r, model, scaler, features)
 
     return {
         "status":        "trained",
@@ -289,7 +297,7 @@ async def score_ip(ip: str):
         "features":      features,
         "source":        "live",
     }
-    await r.setex(f"ml:score:{ip}", 300,
+    await r.set(f"ml:score:{ip}",
         json.dumps({k:v for k,v in result.items() if k!="ip"}))
     return result
 
@@ -374,6 +382,17 @@ async def get_clusters():
 async def list_anomalies():
     r    = await get_redis()
     keys = await r.keys("ml:score:*")
+    if not keys:
+        model_path  = MODEL_DIR/"isolation_forest.pkl"
+        scaler_path = MODEL_DIR/"scaler.pkl"
+        if model_path.exists() and scaler_path.exists():
+            features = await get_all_ip_features(r)
+            if features:
+                model  = joblib.load(model_path)
+                scaler = joblib.load(scaler_path)
+                await score_and_cache_features(r, model, scaler, features)
+                keys = await r.keys("ml:score:*")
+
     anomalies = []
     for key in keys:
         val = await r.get(key)

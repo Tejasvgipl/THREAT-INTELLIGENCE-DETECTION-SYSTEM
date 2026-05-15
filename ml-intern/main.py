@@ -478,6 +478,14 @@ async def approve_model(model_id: str):
     metadata["approved_at"] = utc_now().isoformat()
     await save_model_metadata(r, metadata)
     await r.set(ACTIVE_KEY, model_id)
+    last_train = await r.get(LAST_TRAIN_KEY)
+    if last_train:
+        try:
+            last_train_metadata = json.loads(last_train)
+            if last_train_metadata.get("model_id") == model_id:
+                await r.set(LAST_TRAIN_KEY, json.dumps(metadata))
+        except Exception:
+            pass
     return {"status": "approved", "active_model": metadata, "previous_model": previous}
 
 

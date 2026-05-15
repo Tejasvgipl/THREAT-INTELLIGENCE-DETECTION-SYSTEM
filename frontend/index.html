@@ -3221,9 +3221,12 @@
       const check = status.latest_check || {};
       const allModels = models?.models || [];
       const candidates = allModels.filter(m => m.status === 'candidate');
+      const latestCandidate = candidates[0] || null;
       const active = status.active_model;
 
-      document.getElementById('mi-posture').textContent = active ? 'Active model governed' : latest ? 'Candidate waiting for approval' : 'No approved model yet';
+      document.getElementById('mi-posture').textContent = active
+        ? (latestCandidate ? 'Active model governed · candidate waiting' : 'Active model governed')
+        : latestCandidate ? 'Candidate waiting for approval' : 'No approved model yet';
       document.getElementById('mi-summary').textContent = latest
         ? `${latest.model_id} trained on ${fmtNumber(latest.training_rows)} rows. ${latest.report_summary || ''}`
         : 'ML Intern is monitoring Redis and will create candidate models when hybrid retraining conditions are met.';
@@ -3236,8 +3239,8 @@
       document.getElementById('mi-drift').textContent = check.drift_score ?? '—';
       document.getElementById('mi-drift-threshold').textContent = `threshold ${check.thresholds?.drift ?? '—'}`;
       document.getElementById('mi-candidate-count').textContent = candidates.length;
-      document.getElementById('mi-candidate-state').textContent = latest ? latest.status : 'none';
-      document.getElementById('mi-candidate-body').innerHTML = renderMLInternCandidate(latest);
+      document.getElementById('mi-candidate-state').textContent = latestCandidate ? latestCandidate.status : 'none';
+      document.getElementById('mi-candidate-body').innerHTML = renderMLInternCandidate(latestCandidate);
       document.getElementById('mi-check-time').textContent = check.checked_at ? fmtModelTime(check.checked_at) : 'live';
       document.getElementById('mi-trigger-body').innerHTML = renderMLInternTriggers(check);
       document.getElementById('mi-model-count').textContent = allModels.length + ' version(s)';
@@ -3411,6 +3414,11 @@
     }
     async function loadAnomalies() {
       const r = await get(`${ML}/anomalies`); if (!r) return;
+      const mlh = await get(`${ML}/health`);
+      const ready = Boolean(mlh?.model_ready);
+      document.getElementById('train-status').textContent = ready
+        ? `Current model loaded · ${r.anomalies.length} anomalies`
+        : 'No trained model yet';
       document.getElementById('anom-tbody').innerHTML = r.anomalies.length
         ? r.anomalies.map(a => `<tr onclick="openMLScore('${a.ip}')" style="cursor:pointer">
       <td style="color:var(--accent)">${a.ip}</td>
@@ -3422,7 +3430,7 @@
         <button class="btn ai" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();aiMLExplainFor('${a.ip}')">AI</button>
       </td>
     </tr>`).join('')
-        : '<tr><td colspan="5" class="empty">Train the model first</td></tr>';
+        : `<tr><td colspan="5" class="empty">${ready ? 'No anomalies found in the current trained model' : 'Train the model first'}</td></tr>`;
     }
     async function loadClusters() {
       const r = await get(`${ML}/clusters`); if (!r) return;
