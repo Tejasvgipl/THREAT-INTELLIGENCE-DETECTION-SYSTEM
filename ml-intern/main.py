@@ -234,6 +234,13 @@ async def save_model_metadata(r: aioredis.Redis, metadata: dict) -> None:
     await r.hset(META_KEY, metadata["model_id"], json.dumps(metadata))
 
 
+async def clear_cached_ml_scores(r: aioredis.Redis) -> int:
+    deleted = 0
+    async for key in r.scan_iter(match="ml:score:*", count=500):
+        deleted += await r.delete(key)
+    return deleted
+
+
 async def latest_training_metadata(r: aioredis.Redis) -> Optional[dict]:
     raw = await r.get(LAST_TRAIN_KEY)
     if raw:
@@ -486,7 +493,13 @@ async def approve_model(model_id: str):
                 await r.set(LAST_TRAIN_KEY, json.dumps(metadata))
         except Exception:
             pass
-    return {"status": "approved", "active_model": metadata, "previous_model": previous}
+    cleared_scores = await clear_cached_ml_scores(r)
+    return {
+        "status": "approved",
+        "active_model": metadata,
+        "previous_model": previous,
+        "cleared_ml_scores": cleared_scores,
+    }
 
 
 @app.post("/rollback")
@@ -517,7 +530,8 @@ async def rollback():
     target["rollback_activated_at"] = utc_now().isoformat()
     await save_model_metadata(r, target)
     await r.set(ACTIVE_KEY, target["model_id"])
-    return {"status": "rolled_back", "active_model": target}
+    cleared_scores = await clear_cached_ml_scores(r)
+    return {"status": "rolled_back", "active_model": target, "cleared_ml_scores": cleared_scores}
 
 
 @app.get("/reports/latest")
